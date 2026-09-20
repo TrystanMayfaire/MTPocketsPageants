@@ -1,0 +1,127 @@
+/* Auto-generated theme from Flyer Image */
+:root {
+  --mt-primary: #ff741f;
+  --mt-primary-dark: #662e0c;
+  --mt-secondary: #f4dfa1;
+  --mt-accent: #ff7421;
+  --mt-bg-light: #f4f6f8;
+
+  /* Dynamic Text Contrast Variables */
+  --mt-text-on-primary: #ffffff;
+  --mt-text-on-secondary: #1a1a1a;
+  --mt-text-on-accent: #ffffff;
+  --mt-header-subtitle: rgba(255, 255, 255, 0.85);
+}
+
+body {
+  background-color: var(--mt-bg-light);
+  color: #2b2b2b;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Header Banner */
+.pageant-header {
+  background: linear-gradient(135deg, var(--mt-primary) 0%, var(--mt-primary-dark) 100%);
+  color: var(--mt-text-on-primary);
+  padding: 32px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.text-gold,
+.pageant-header .lead {
+  color: var(--mt-header-subtitle) !important;
+}
+
+/* Flyer Image Card */
+.flyer-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+}
+
+.flyer-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+/* Dynamic Card Headers */
+.card-custom {
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+.card-header-primary {
+  background-color: var(--mt-primary);
+  color: var(--mt-text-on-primary);
+  padding: 14px 20px;
+}
+
+.card-header-secondary {
+  background-color: var(--mt-secondary);
+  color: var(--mt-text-on-secondary);
+  padding: 14px 20px;
+}
+
+.card-header-disclaimer {
+  background-color: #343a40;
+  color: #ffffff;
+}
+
+/* Details / Accordions */
+summary:hover {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Radio Cards & Selection Options */
+.custom-radio-group label {
+  display: block;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.custom-radio-group label:hover {
+  background-color: #f0e4f2;
+  border-color: var(--mt-primary);
+}
+
+.custom-radio-group input[type="radio"] {
+  accent-color: var(--mt-primary);
+  margin-right: 8px;
+}
+
+/* Rules / Disclaimer Text Box */
+.disclaimer-full-text {
+  background-color: #fff8e7;
+  border: 1px solid #ffe8a1;
+  border-radius: 6px;
+  padding: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.88rem;
+  color: #444;
+}
+
+/* Sticky Checkout Box */
+.checkout-card {
+  background: linear-gradient(180deg, #1e1e2d 0%, #12121a 100%);
+  border-radius: 12px;
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.total-amount-display {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--mt-accent);
+}
