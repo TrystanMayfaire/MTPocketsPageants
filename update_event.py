@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 # Configuration
-SERVICE_ACCOUNT_FILE = "pageant_service_account.json"
+SERVICE_ACCOUNT_FILE = "/home/mtpocketstheatre/secrets/pageant-service-account.json"
 FOLDER_NAME = "Current_Pageant"
 CONFIG_OUTPUT_PATH = "assets/config.json"
 FLYER_OUTPUT_PATH = "assets/flyer.jpg"
