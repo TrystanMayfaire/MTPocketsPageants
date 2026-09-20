@@ -10,11 +10,12 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 # Configuration
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SERVICE_ACCOUNT_FILE = "/home/mtpocketstheatre/secrets/pageant-service-account.json"
 FOLDER_NAME = "Current_Pageant"
-CONFIG_OUTPUT_PATH = "assets/config.json"
-FLYER_OUTPUT_PATH = "assets/flyer.jpg"
-CSS_OUTPUT_PATH = "assets/custom.css"
+CONFIG_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "config.json")
+FLYER_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "flyer.jpg")
+CSS_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "custom.css")
 
 SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",

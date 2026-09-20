@@ -40,7 +40,7 @@ PAYPAL_CLIENT_ID = "test"
 app = dash.Dash(
     __name__,
     requests_pathname_prefix=PATH_PREFIX,
-    routes_pathname_prefix=PATH_PREFIX,
+    routes_pathname_prefix='/',
     external_stylesheets=[
         "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     ],
