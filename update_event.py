@@ -11,7 +11,10 @@ from googleapiclient.http import MediaIoBaseDownload
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SERVICE_ACCOUNT_FILE = "/home/mtpocketstheatre/secrets/pageant-service-account.json"
+if not os.path.isfile("/home/mtpocketstheatre/secrets/pageant-service-account.json"):
+    SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, "pageant_service_account.json")
+else:
+    SERVICE_ACCOUNT_FILE = "/home/mtpocketstheatre/secrets/pageant_service_account.json"
 FOLDER_NAME = "Current_Pageant"
 CONFIG_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "config.json")
 FLYER_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "flyer.jpg")
