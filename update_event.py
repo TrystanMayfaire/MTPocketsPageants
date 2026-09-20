@@ -281,6 +281,21 @@ summary:hover {{
   font-weight: 800;
   color: var(--mt-accent);
 }}
+
+/* PERMANENT INPUT BOX SIZING FIXES */
+.card-body input,
+.card-body textarea,
+.card-body .form-control {{
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}}
+
+.card-body .Select-control,
+.card-body .dash-dropdown {{
+  width: 100% !important;
+}}
 """
     os.makedirs(os.path.dirname(css_path), exist_ok=True)
     with open(css_path, "w", encoding="utf-8") as f:
