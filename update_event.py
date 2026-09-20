@@ -4,18 +4,18 @@ import re
 import os
 import colorsys
 from PIL import Image
-
+from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if not os.path.isfile("/home/mtpocketstheatre/secrets/pageant-service-account.json"):
-    SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, "pageant_service_account.json")
-else:
-    SERVICE_ACCOUNT_FILE = "/home/mtpocketstheatre/secrets/pageant_service_account.json"
+dotenv_path = os.path.join(BASE_DIR, "secrets", ".env")
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
 FOLDER_NAME = "Current_Pageant"
+SERVICE_ACCOUNT_FILE = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 CONFIG_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "config.json")
 FLYER_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "flyer.jpg")
 CSS_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "custom.css")

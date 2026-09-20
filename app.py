@@ -1,10 +1,14 @@
 import json
 import os
 import dash
+from dotenv import load_dotenv
 from dash import html, dcc, Input, Output, ALL, State
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "assets", "config.json")
+dotenv_path = os.path.join(BASE_DIR, "secrets", ".env")
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
 IS_PRODUCTION = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") is not None
 PATH_PREFIX = "/pageant/" if IS_PRODUCTION else "/"
 
@@ -35,7 +39,7 @@ else:
     print(f"WARNING: Configuration file not found at {CONFIG_PATH}")
 
 # PayPal Client ID ('test' for sandbox, or your live client ID)
-PAYPAL_CLIENT_ID = "test"
+PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "test")
 
 app = dash.Dash(
     __name__,
