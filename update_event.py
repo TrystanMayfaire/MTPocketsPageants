@@ -21,8 +21,9 @@ FLYER_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "flyer.jpg")
 CSS_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "custom.css")
 
 SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
-    "https://www.googleapis.com/auth/forms.body.readonly"
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/forms.body.readonly",
+    "https://www.googleapis.com/auth/spreadsheets"
 ]
 
 # --- COLOR EXTRACTION & CSS GENERATION HELPERS ---
@@ -305,6 +306,63 @@ summary:hover {{
         f.write(css_content.strip())
     print(f"Updated '{css_path}' with extracted theme palette: {colors}")
 
+# --- GOOGLE DRIVE API HELPERS ---
+
+def get_or_create_headshots_folder(drive_service, parent_folder_id):
+    """Finds or creates a 'Headshots' subfolder in Google Drive."""
+    query = f"'{parent_folder_id}' in parents and name = 'Headshots' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    res = drive_service.files().list(q=query, fields="files(id, name)", supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+    files = res.get("files", [])
+    if files:
+        return files[0]["id"]
+
+    file_metadata = {
+        "name": "Headshots",
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [parent_folder_id]
+    }
+    folder = drive_service.files().create(body=file_metadata, fields="id", supportsAllDrives=True).execute()
+    return folder.get("id")
+
+def get_or_create_google_sheet(drive_service, sheets_service, parent_folder_id, headers):
+    """Finds or creates a Google Sheet directly in the parent folder and writes column headers."""
+    query = f"'{parent_folder_id}' in parents and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
+    res = drive_service.files().list(
+        q=query,
+        fields="files(id, name)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
+    ).execute()
+    files = res.get("files", [])
+
+    if files:
+        spreadsheet_id = files[0]["id"]
+        print(f"Found existing Google Sheet (ID: {spreadsheet_id})")
+    else:
+        # Create Google Sheet directly inside the target Drive folder
+        file_metadata = {
+            "name": "Pageant Registrations",
+            "mimeType": "application/vnd.google-apps.spreadsheet",
+            "parents": [parent_folder_id]
+        }
+        sheet_file = drive_service.files().create(
+            body=file_metadata,
+            fields="id",
+            supportsAllDrives=True
+        ).execute()
+        spreadsheet_id = sheet_file.get("id")
+        print(f"Created new Google Sheet in Drive folder (ID: {spreadsheet_id})")
+
+    # Write or update row 1 headers matching the current form schema
+    sheets_service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range="A1",
+        valueInputOption="RAW",
+        body={"values": [headers]}
+    ).execute()
+
+    return spreadsheet_id
+
 # --- FORM & TEXT PARSING HELPERS ---
 
 def clean_title(raw_title):
@@ -394,6 +452,7 @@ def sync_current_pageant():
 
     drive_service = build("drive", "v3", credentials=creds)
     forms_service = build("forms", "v1", credentials=creds)
+    sheets_service = build("sheets", "v4", credentials=creds)
 
     # 1. Locate 'Current_Pageant' folder in Google Drive
     print(f"Searching for folder '{FOLDER_NAME}' in Google Drive...")
@@ -566,6 +625,125 @@ def sync_current_pageant():
                     "type": "textarea" if is_paragraph else "text",
                     "required": required
                 })
+
+    # Define mandatory fields required by the registration system
+    MANDATORY_FIELDS = [
+        {
+            "id": "contact_email",
+            "label": "Contact Email (Contestant or Parent/Guardian)",
+            "description": "Primary email address for confirmation and event updates.",
+            "type": "email",
+            "required": True,
+            "keywords": ["email", "e-mail", "contact email"]
+        },
+        {
+            "id": "date_of_birth",
+            "label": "Contestant Date of Birth",
+            "description": "Format: MM/DD/YYYY",
+            "type": "date",
+            "required": True,
+            "keywords": ["birth", "dob", "date of birth", "age / birth"]
+        },
+        {
+            "id": "phone_number",
+            "label": "Contact Phone Number",
+            "description": "Primary contact number.",
+            "type": "tel",
+            "required": True,
+            "keywords": ["phone", "telephone", "mobile", "cell"]
+        },
+        {
+            "id": "headshot_upload",
+            "label": "Contestant Headshot / Photo Upload",
+            "description": "Please upload a clear photo or headshot for the program.",
+            "type": "file",
+            "required": True,
+            "keywords": ["photo", "headshot", "picture", "upload photo"]
+        }
+    ]
+
+    # 1. Normalize or inject mandatory fields
+    existing_field_ids = [f["id"] for f in config["form_fields"]]
+
+    for req in MANDATORY_FIELDS:
+        matched = False
+        for field in config["form_fields"]:
+            field_label_lower = field["label"].lower()
+            field_id_lower = field["id"].lower()
+
+            if any(kw in field_label_lower or kw in field_id_lower for kw in req["keywords"]):
+                field["id"] = req["id"]
+                field["type"] = req["type"]
+                field["required"] = True
+                matched = True
+                break
+
+        if not matched and req["id"] not in existing_field_ids:
+            config["form_fields"].append({
+                "id": req["id"],
+                "label": req["label"],
+                "description": req["description"],
+                "type": req["type"],
+                "required": True
+            })
+
+    # 2. Reorder form fields logically:
+    #    [Name/Identity Fields] -> [Email, DOB, Phone] -> [Other Fields] -> [Headshot Upload]
+    PERSONAL_INFO_IDS = ["contact_email", "date_of_birth", "phone_number"]
+    HEADSHOT_ID = "headshot_upload"
+
+    name_fields = []
+    personal_fields = []
+    other_fields = []
+    headshot_fields = []
+
+    for field in config["form_fields"]:
+        fid = field["id"]
+        label_lower = field["label"].lower()
+
+        if fid in PERSONAL_INFO_IDS:
+            personal_fields.append(field)
+        elif fid == HEADSHOT_ID:
+            headshot_fields.append(field)
+        elif any(kw in label_lower for kw in ["name", "contestant", "parent", "guardian"]):
+            name_fields.append(field)
+        else:
+            other_fields.append(field)
+
+    # Sort personal info fields to maintain exact order: Email -> DOB -> Phone
+    personal_fields.sort(key=lambda f: PERSONAL_INFO_IDS.index(f["id"]) if f["id"] in PERSONAL_INFO_IDS else 99)
+
+    # Combine into final ordered list
+    config["form_fields"] = name_fields + personal_fields + other_fields + headshot_fields
+
+    # Create / Get Headshots Folder
+    headshots_folder_id = get_or_create_headshots_folder(drive_service, folder_id)
+
+    # Build dynamic headers list
+    headers = ["Timestamp", "Transaction ID", "Amount Paid"]
+    for field in config["form_fields"]:
+        if field["id"] == "headshot_upload":
+            headers.append("Headshot Image Link")
+        else:
+            headers.append(field["label"])
+
+    headers.append("Division")
+    for addon in config["addons"]:
+        headers.append(f"Add-On: {addon['title']}")
+    headers.append("Disclaimer Agreed")
+
+    # Create or update destination Google Sheet
+    spreadsheet_id = get_or_create_google_sheet(drive_service, sheets_service, folder_id, headers)
+
+    # Attach IDs to config object
+    config["spreadsheet_id"] = spreadsheet_id
+    config["headshot_folder_id"] = headshots_folder_id
+    config["sheet_headers"] = headers
+
+    # Save assets/config.json
+    os.makedirs(os.path.dirname(CONFIG_OUTPUT_PATH), exist_ok=True)
+    with open(CONFIG_OUTPUT_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4)
 
     # 7. Save assets/config.json
     os.makedirs(os.path.dirname(CONFIG_OUTPUT_PATH), exist_ok=True)

@@ -151,10 +151,24 @@
             "required": true
         },
         {
+            "id": "contact_email",
+            "label": "Contact Email (Contestant or Parent/Guardian)",
+            "description": "Primary email address for confirmation and event updates.",
+            "type": "email",
+            "required": true
+        },
+        {
+            "id": "date_of_birth",
+            "label": "Contestant Date of Birth",
+            "description": "Format: MM/DD/YYYY",
+            "type": "date",
+            "required": true
+        },
+        {
             "id": "phone_number",
             "label": "Phone Number",
             "description": "",
-            "type": "text",
+            "type": "tel",
             "required": true
         },
         {
@@ -198,6 +212,13 @@
             "description": "",
             "type": "text",
             "required": false
+        },
+        {
+            "id": "headshot_upload",
+            "label": "Contestant Headshot / Photo Upload",
+            "description": "Please upload a clear photo or headshot for the program.",
+            "type": "file",
+            "required": true
         }
     ],
     "disclaimer": {
@@ -209,5 +230,30 @@
             "I do not agree to the above statement"
         ],
         "required": false
-    }
+    },
+    "spreadsheet_id": "1Ee3nhUHTwXPg2wuyn8HlV6BiHNp4culylrhlE5hIHps",
+    "headshot_folder_id": "19KSfFepWvqq-4UKJjEP50Ydw89V3fB5U",
+    "sheet_headers": [
+        "Timestamp",
+        "Transaction ID",
+        "Amount Paid",
+        "Contestant Name",
+        "Contestant's Parent/Legal Guardian (If Contestant is under 18 years old)",
+        "Contestant's Age as of 10/17/26",
+        "Contact Email (Contestant or Parent/Guardian)",
+        "Contestant Date of Birth",
+        "Phone Number",
+        "Where are you from? (City and State)",
+        "Year in school or profession (if applicable)",
+        "What is your favorite thing about Halloween?",
+        "What is your favorite candy?",
+        "What are three words to describe you?",
+        "How did you hear about this pageant? (Let us know, FOR SCIENCE \n! :) )",
+        "Headshot Image Link",
+        "Division",
+        "Add-On: Themewear (Optional Event)\nTheme is \u201cSparkles\u201d \n*This is an OPTIONAL ADD ON where the contestant can win a separate award. You MUST enter the Main Event to enter this optional. The contestant will dress in anything that fits the theme \u201cSparkles.\u201d This does not affect the scores for the main pageant.",
+        "Add-On: Talent (Optional Event)\nTalent of choice! This is an OPTIONAL ADD ON where the contestant can win a separate award. You MUST enter the Main Event to enter this optional. This does not affect the scores for the main pageant.",
+        "Add-On: Photogenic $5 per photo (Optional Event)\nPhotos will be judged and the overall photogenic winner will receive an award. This is OPTIONAL and photo scores do not affect scores for the main pageant. You MUST bring physical copies of the photos to the pageant. You may also bring additional photos to the pageant with the corresponding fee if you decide to enter the photogenic optional after submitting this application.",
+        "Disclaimer Agreed"
+    ]
 }
