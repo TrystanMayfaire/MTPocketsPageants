@@ -64,6 +64,10 @@
         {
             "label": "Boys of all ages",
             "price": 50.0
+        },
+        {
+            "label": "TEST",
+            "price": 1.00
         }
     ],
     "addons": [

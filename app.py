@@ -433,8 +433,7 @@ app.layout = html.Div(children=[
                                     id="division-select",
                                     options=[
                                         {"label": f"{div['label']} — ${div['price']:.2f}", "value": div['label']}
-                                        for div in EVENT_CONFIG.get("divisions", [])]+
-                                        [{"label": f"TEST — $1.00", "value": "TEST - $1.00"}
+                                        for div in EVENT_CONFIG.get("divisions", [])
                                     ],
                                     value=EVENT_CONFIG["divisions"][0]["label"] if EVENT_CONFIG.get("divisions") else None,
                                     clearable=False,
