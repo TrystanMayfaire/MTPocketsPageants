@@ -7,9 +7,9 @@ import httplib2
 import requests
 import google_auth_httplib2
 from datetime import datetime
-from flask import request, jsonify
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from flask import request, jsonify, make_response
 from googleapiclient.http import MediaIoBaseUpload
 import dash_bootstrap_components as dbc
 from dotenv import load_dotenv
@@ -875,10 +875,14 @@ def get_paypal_access_token():
     response = requests.post(f"{PAYPAL_API_BASE}/v1/oauth2/token", auth=auth, headers=headers, data=data)
     return response.json().get("access_token")
 
-@app.server.route(REQUESTS_PREFIX + 'api/paypal/create-order', methods=['POST', 'OPTIONS'], strict_slashes=False)
+@app.server.route('/api/paypal/create-order', methods=['POST', 'OPTIONS'], strict_slashes=False)
 def create_order():
     if request.method == 'OPTIONS':
-        return '', 200
+        response = make_response('', 200)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        return response
 
     access_token = get_paypal_access_token()
     payload = request.get_json() or {}
@@ -900,7 +904,7 @@ def create_order():
     res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=data, headers=headers)
     return jsonify(res.json()), res.status_code
 
-@app.server.route(REQUESTS_PREFIX + 'api/paypal/capture-order/<order_id>', methods=['POST', 'OPTIONS'], strict_slashes=False)
+@app.server.route('/api/paypal/capture-order/<order_id>', methods=['POST', 'OPTIONS'], strict_slashes=False)
 def capture_order(order_id):
     access_token = get_paypal_access_token()
     headers = {
@@ -910,6 +914,10 @@ def capture_order(order_id):
     res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders/{order_id}/capture", headers=headers)
     return jsonify(res.json()), res.status_code
 
+@app.server.before_request
+def log_request_info():
+    if 'paypal' in request.path:
+        print(f"Incoming Request -> Method: {request.method}, Path: {request.path}, Full URL: {request.url}")
 
 if __name__ == "__main__":
     app.run(debug=True)
