@@ -27,7 +27,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     label:  'paypal'
                 },
                 createOrder: function(data, actions) {
-                    return fetch('/api/paypal/create-order', {
+                    return fetch('/pageant/api/paypal/create-order', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -44,7 +44,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     });
                 },
                 onApprove: function(data, actions) {
-                    return fetch('/api/paypal/capture-order/' + data.orderID, {
+                    return fetch('/pageant/api/paypal/capture-order/' + data.orderID, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
