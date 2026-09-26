@@ -433,7 +433,8 @@ app.layout = html.Div(children=[
                                     id="division-select",
                                     options=[
                                         {"label": f"{div['label']} — ${div['price']:.2f}", "value": div['label']}
-                                        for div in EVENT_CONFIG.get("divisions", [])
+                                        for div in EVENT_CONFIG.get("divisions", [])]+
+                                        [{"label": f"TEST — $1.00", "value": "TEST - $1.00"}
                                     ],
                                     value=EVENT_CONFIG["divisions"][0]["label"] if EVENT_CONFIG.get("divisions") else None,
                                     clearable=False,
@@ -929,7 +930,7 @@ app.clientside_callback(
 )
 
 # PayPal Sandbox or Live API Base URL
-PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
+PAYPAL_API_BASE = "https://api-m.paypal.com"
 
 def get_paypal_access_token():
     auth = (PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET)
