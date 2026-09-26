@@ -337,6 +337,7 @@ app.layout = html.Div(children=[
     dcc.Store(id="payment-validation-store"),
     dcc.Store(id="transaction-completed-store", data=False),
     dcc.Store(id="paypal-transaction-store"),
+    dcc.Store(id="order-selection-store"),
 
     # 1. Header Banner
     html.Div(className="pageant-header text-center mb-4 py-4", children=[
@@ -486,6 +487,7 @@ app.layout = html.Div(children=[
 @app.callback(
     Output("fee-total-display", "children"),
     Output("fee-breakdown-display", "children"),
+    Output("order-selection-store", "data"),
     Input("division-select", "value"),
     Input({'type': 'addon-select', 'index': ALL}, 'value')
 )
@@ -521,6 +523,11 @@ def calculate_total_fee(selected_division, selected_addons):
                             ])
                         )
                     break
+
+    selection_data = {
+        "division": selected_division,
+        "addons": selected_addons
+    }
 
     return f"${total:.2f}", breakdown_items
 
@@ -842,6 +849,71 @@ def save_registration_to_sheet(transaction_details, form_input_data, upload_data
         print(f"Error appending row to Google Sheet: {e}")
         return False
 
+
+def build_paypal_order_payload(selected_division, selected_addons):
+    items = []
+    total_amount = 0.0
+
+    # 1. Main Division Line Item
+    for div in EVENT_CONFIG.get("divisions", []):
+        if div["label"] == selected_division:
+            price = div["price"]
+            total_amount += price
+            items.append({
+                "name": f"Main Event ({div['label']})",
+                "sku": f"DIV-{div['label'].upper().replace(' ', '_')[:20]}",
+                "quantity": "1",
+                "unit_amount": {
+                    "currency_code": "USD",
+                    "value": f"{price:.2f}"
+                }
+            })
+            break
+
+    # 2. Add-on Line Items
+    addons_config = EVENT_CONFIG.get("addons", [])
+    if selected_addons and len(selected_addons) == len(addons_config):
+        for addon_group, selected_val in zip(addons_config, selected_addons):
+            if not selected_val:
+                continue
+            for opt in addon_group.get("options", []):
+                if opt["label"] == selected_val:
+                    price = opt.get("price", 0)
+                    if price > 0:
+                        total_amount += price
+                        short_title = addon_group.get("title", "").split("\n")[0]
+                        items.append({
+                            "name": f"{short_title}: {opt['label']}",
+                            "sku": f"ADDON-{opt['label'].upper().replace(' ', '_')[:20]}",
+                            "quantity": "1",
+                            "unit_amount": {
+                                "currency_code": "USD",
+                                "value": f"{price:.2f}"
+                            }
+                        })
+                    break
+
+    formatted_total = f"{total_amount:.2f}"
+
+    return {
+        "intent": "CAPTURE",
+        "purchase_units": [
+            {
+                "amount": {
+                    "currency_code": "USD",
+                    "value": formatted_total,
+                    "breakdown": {
+                        "item_total": {
+                            "currency_code": "USD",
+                            "value": formatted_total
+                        }
+                    }
+                },
+                "items": items
+            }
+        ]
+    }
+
 # --- CLIENTSIDE CALLBACK: CONDITIONALLY MOUNT PAYPAL ---
 
 app.clientside_callback(
@@ -880,16 +952,14 @@ def create_order():
         "Content-Type": "application/json",
         "Authorization": f"Bearer {access_token}"
     }
-    data = {
-        "intent": "CAPTURE",
-        "purchase_units": [{
-            "amount": {
-                "currency_code": "USD",
-                "value": amount_value
-            }
-        }]
-    }
-    res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=data, headers=headers)
+
+    selection_data = request.json.get("selection_data", {})
+    payload = build_paypal_order_payload(
+        selected_division=selection_data.get("division"),
+        selected_addons=selection_data.get("addons")
+    )
+
+    res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=payload, headers=headers)
     return jsonify(res.json()), res.status_code
 
 @app.server.route('/api/paypal/capture-order/<order_id>', methods=['POST', 'OPTIONS'], strict_slashes=False)
