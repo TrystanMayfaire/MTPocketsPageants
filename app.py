@@ -3,6 +3,8 @@ import io
 import json
 import dash
 import base64
+import httplib2
+import google_auth_httplib2
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -696,14 +698,32 @@ def handle_payment_success(trans_data, input_values, upload_contents, selected_d
     return True
 
 # ---- GOOGLE SERVICES API HELPER FUNCTIONS ----
+def get_authorized_http(creds):
+    """Configures httplib2 to route through PythonAnywhere proxy if environment variables are present."""
+    proxy_url = os.environ.get("http_proxy") or os.environ.get("https_proxy")
+    if proxy_url:
+        import urllib.parse
+        parsed = urllib.parse.urlparse(proxy_url)
+        proxy_info = httplib2.ProxyInfo(
+            proxy_type=httplib2.socks.PROXY_TYPE_HTTP,
+            proxy_host=parsed.hostname,
+            proxy_port=parsed.port
+        )
+        http_client = httplib2.Http(proxy_info=proxy_info)
+    else:
+        http_client = httplib2.Http()
+
+    return google_auth_httplib2.AuthorizedHttp(creds, http=http_client)
+
 def get_google_services():
     service_account_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if not service_account_file or not os.path.exists(service_account_file):
         print("ERROR: Service account credentials file missing.")
         return None, None
     creds = service_account.Credentials.from_service_account_file(service_account_file, scopes=GOOGLE_SCOPES)
-    drive_service = build("drive", "v3", credentials=creds)
-    sheets_service = build("sheets", "v4", credentials=creds)
+    authorized_http = get_authorized_http(creds)
+    drive_service = build("drive", "v3", http=authorized_http)
+    sheets_service = build("sheets", "v4", http=authorized_http)
     return drive_service, sheets_service
 
 def upload_headshot_to_drive(drive_service, folder_id, base64_contents, contestant_name):

@@ -2,8 +2,10 @@ import io
 import re
 import os
 import json
+import httplib2
 import colorsys
 from PIL import Image
+import google_auth_httplib2
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -479,6 +481,22 @@ def sanitize_field_id(title):
     return re.sub(r'\s+', '_', clean)
 
 # --- MAIN SYNC PIPELINE ---
+def get_authorized_http(creds):
+    """Configures httplib2 to route through PythonAnywhere proxy if environment variables are present."""
+    proxy_url = os.environ.get("http_proxy") or os.environ.get("https_proxy")
+    if proxy_url:
+        import urllib.parse
+        parsed = urllib.parse.urlparse(proxy_url)
+        proxy_info = httplib2.ProxyInfo(
+            proxy_type=httplib2.socks.PROXY_TYPE_HTTP,
+            proxy_host=parsed.hostname,
+            proxy_port=parsed.port
+        )
+        http_client = httplib2.Http(proxy_info=proxy_info)
+    else:
+        http_client = httplib2.Http()
+
+    return google_auth_httplib2.AuthorizedHttp(creds, http=http_client)
 
 def sync_current_pageant():
     print("Authenticating with Service Account...")
@@ -486,9 +504,10 @@ def sync_current_pageant():
         SERVICE_ACCOUNT_FILE, scopes=SCOPES
     )
 
-    drive_service = build("drive", "v3", credentials=creds)
-    forms_service = build("forms", "v1", credentials=creds)
-    sheets_service = build("sheets", "v4", credentials=creds)
+    authorized_http = get_authorized_http(creds)
+    drive_service = build("drive", "v3", http=authorized_http)
+    forms_service = build("forms", "v1", http=authorized_http)
+    sheets_service = build("sheets", "v4", http=authorized_http)
 
     # 1. Locate 'Current_Pageant' folder in Google Drive
     print(f"Searching for folder '{FOLDER_NAME}' in Google Drive...")
