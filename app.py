@@ -527,7 +527,8 @@ def calculate_total_fee(selected_division, selected_addons):
 
     selection_data = {
         "division": selected_division,
-        "addons": selected_addons
+        "addons": selected_addons,
+        "amount": total,
     }
 
     return f"${total:.2f}", breakdown_items, selection_data
@@ -548,11 +549,6 @@ def calculate_total_fee(selected_division, selected_addons):
 )
 def validate_form_and_payment(input_values, upload_contents, selected_division, disclaimer_val,
                               fee_str, input_ids, upload_ids, order_data):
-    try:
-        amount = float(str(fee_str).replace("$", "").strip())
-    except (ValueError, TypeError, AttributeError):
-        amount = 0.0
-
     input_map = {item["id"]: val for item, val in zip(input_ids, input_values)}
     upload_map = {item["id"]: val for item, val in zip(upload_ids, upload_contents)}
 

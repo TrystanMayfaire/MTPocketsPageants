@@ -22,6 +22,8 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                 return "Form Incomplete (Division Required)";
             }
 
+            const amount = orderData.amount.toFixed(2);
+
             paypal.Buttons({
                 style: {
                     layout: 'vertical',
@@ -108,7 +110,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                 }
             }).render('#paypal-button-container');
 
-            return "PayPal Mounted ($" + amount.toFixed(2) + ")";
+            return "PayPal Mounted ($" + amount + ")";
         }
     }
 });
