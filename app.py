@@ -13,9 +13,25 @@ from dash import html, dcc, Input, Output, ALL, State, MATCH, ClientsideFunction
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "assets", "config.json")
-dotenv_path = os.path.join(BASE_DIR, "secrets", ".env")
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
+
+possible_env_paths = [
+    os.path.join(BASE_DIR, "secrets", ".env"),
+    os.path.join(BASE_DIR, ".env"),
+    "/home/mtpocketstheatre/secrets/.env",
+    os.path.expanduser("~/secrets/.env")
+]
+
+env_loaded = False
+for env_path in possible_env_paths:
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        print(f"Loaded environment variables from: {env_path}")
+        env_loaded = True
+        break
+
+if not env_loaded:
+    print("Warning: Could not find a .env file in expected locations.")
+
 IS_PRODUCTION = (
     os.environ.get("PYTHONANYWHERE_SITE") is not None
     or os.environ.get("APP_ENV") == "production"

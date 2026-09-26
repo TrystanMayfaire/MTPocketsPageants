@@ -34,10 +34,17 @@ SERVICE_ACCOUNT_FILE = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
 # Fallback: if env variable wasn't set, explicitly search /home/mtpocketstheatre/secrets/
 if not SERVICE_ACCOUNT_FILE or not os.path.exists(SERVICE_ACCOUNT_FILE):
-    fallback_json = "/home/mtpocketstheatre/secrets/pageant-service-account.json"
-    if os.path.exists(fallback_json):
-        SERVICE_ACCOUNT_FILE = fallback_json
-        print(f"Auto-detected Service Account JSON at: {SERVICE_ACCOUNT_FILE}")
+    possible_sa_paths = [
+        os.path.join(BASE_DIR, "secrets", "pageant_service_account.json"),
+        os.path.join(BASE_DIR, "pageant_service_account.json"),
+        "/home/mtpocketstheatre/secrets/pageant_service_account.json",
+        os.path.expanduser("~/secrets/pageant_service_account.json")
+    ]
+    for path in possible_sa_paths:
+        if os.path.exists(path):
+            SERVICE_ACCOUNT_FILE = path
+            print(f"Auto-detected Service Account JSON at: {SERVICE_ACCOUNT_FILE}")
+            break
 
 if not SERVICE_ACCOUNT_FILE or not os.path.exists(SERVICE_ACCOUNT_FILE):
     raise FileNotFoundError(
