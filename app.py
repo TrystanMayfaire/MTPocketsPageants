@@ -949,25 +949,76 @@ def create_order():
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         return response
 
-    access_token = get_paypal_access_token()
+    incoming_json = request.get_json() or {}
 
+    # Debug print to server log so you can inspect the exact payload sent by JS
+    print("DEBUG incoming_json:", incoming_json)
+
+    # Safely resolve selection data whether nested under 'selection_data' or at top level
+    if "selection_data" in incoming_json and isinstance(incoming_json["selection_data"], dict):
+        selection_data = incoming_json["selection_data"]
+    else:
+        selection_data = incoming_json
+
+    selected_division = selection_data.get("division")
+    selected_addons = selection_data.get("addons")
+
+    print(f"DEBUG extracted -> division: {repr(selected_division)}, addons: {repr(selected_addons)}")
+
+    # Build PayPal payload
+    order_payload = build_paypal_order_payload(
+        selected_division=selected_division,
+        selected_addons=selected_addons
+    )
+
+    # Check calculated amount before calling PayPal
+    calculated_value = order_payload["purchase_units"][0]["amount"]["value"]
+    if float(calculated_value) <= 0:
+        error_msg = f"Order total calculated to ${calculated_value}. Division '{selected_division}' may not match EVENT_CONFIG labels."
+        print("ERROR:", error_msg)
+        return jsonify({"error": "INVALID_AMOUNT", "message": error_msg}), 400
+
+    access_token = get_paypal_access_token()
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {access_token}"
     }
 
-    selection_data = request.json.get("selection_data", {})
-    payload = build_paypal_order_payload(
-        selected_division=selection_data.get("division"),
-        selected_addons=selection_data.get("addons")
-    )
+    res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=order_payload, headers=headers)
 
-    res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=payload, headers=headers)
-    #Log specific PayPal API error details to PythonAnywhere error log
     if res.status_code not in (200, 201):
-        print(f"PayPal Order Creation Failed ({res.status_code}):", res.text)
+        print(f"PayPal API Error ({res.status_code}):", res.text)
 
     return jsonify(res.json()), res.status_code
+
+# @app.server.route('/api/paypal/create-order', methods=['POST', 'OPTIONS'], strict_slashes=False)
+# def create_order():
+#     if request.method == 'OPTIONS':
+#         response = make_response('', 200)
+#         response.headers['Access-Control-Allow-Origin'] = '*'
+#         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+#         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+#         return response
+#
+#     access_token = get_paypal_access_token()
+#
+#     headers = {
+#         "Content-Type": "application/json",
+#         "Authorization": f"Bearer {access_token}"
+#     }
+#
+#     selection_data = request.json.get("selection_data", {})
+#     payload = build_paypal_order_payload(
+#         selected_division=selection_data.get("division"),
+#         selected_addons=selection_data.get("addons")
+#     )
+#
+#     res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=payload, headers=headers)
+#     #Log specific PayPal API error details to PythonAnywhere error log
+#     if res.status_code not in (200, 201):
+#         print(f"PayPal Order Creation Failed ({res.status_code}):", res.text)
+#
+#     return jsonify(res.json()), res.status_code
 
 @app.server.route('/api/paypal/capture-order/<order_id>', methods=['POST', 'OPTIONS'], strict_slashes=False)
 def capture_order(order_id):
