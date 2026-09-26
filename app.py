@@ -1,4 +1,5 @@
 import os
+import re
 import io
 import json
 import dash
@@ -852,16 +853,16 @@ def save_registration_to_sheet(transaction_details, form_input_data, upload_data
 
 def build_paypal_order_payload(selected_division, selected_addons):
     items = []
-    total_amount = 0.0
 
     # 1. Main Division Line Item
     for div in EVENT_CONFIG.get("divisions", []):
         if div["label"] == selected_division:
-            price = div["price"]
-            total_amount += price
+            price = float(div["price"])
+            # Strip everything except A-Z, 0-9, hyphens, and underscores for SKU compliance
+            clean_sku = re.sub(r'[^a-zA-Z0-9_-]', '', div['label'].upper().replace(' ', '_'))[:20]
             items.append({
-                "name": f"Main Event ({div['label']})",
-                "sku": f"DIV-{div['label'].upper().replace(' ', '_')[:20]}",
+                "name": f"Main Event ({div['label']})"[:127],
+                "sku": f"DIV-{clean_sku}",
                 "quantity": "1",
                 "unit_amount": {
                     "currency_code": "USD",
@@ -878,13 +879,13 @@ def build_paypal_order_payload(selected_division, selected_addons):
                 continue
             for opt in addon_group.get("options", []):
                 if opt["label"] == selected_val:
-                    price = opt.get("price", 0)
+                    price = float(opt.get("price", 0))
                     if price > 0:
-                        total_amount += price
                         short_title = addon_group.get("title", "").split("\n")[0]
+                        clean_sku = re.sub(r'[^a-zA-Z0-9_-]', '', opt['label'].upper().replace(' ', '_'))[:20]
                         items.append({
-                            "name": f"{short_title}: {opt['label']}",
-                            "sku": f"ADDON-{opt['label'].upper().replace(' ', '_')[:20]}",
+                            "name": f"{short_title}: {opt['label']}"[:127],
+                            "sku": f"ADDON-{clean_sku}",
                             "quantity": "1",
                             "unit_amount": {
                                 "currency_code": "USD",
@@ -893,25 +894,29 @@ def build_paypal_order_payload(selected_division, selected_addons):
                         })
                     break
 
-    formatted_total = f"{total_amount:.2f}"
+    # Sum item amounts in integer cents to eliminate float rounding errors
+    total_cents = sum(int(round(float(item["unit_amount"]["value"]) * 100)) for item in items)
+    formatted_total = f"{total_cents / 100:.2f}"
+
+    purchase_unit = {
+        "amount": {
+            "currency_code": "USD",
+            "value": formatted_total
+        }
+    }
+
+    if items:
+        purchase_unit["amount"]["breakdown"] = {
+            "item_total": {
+                "currency_code": "USD",
+                "value": formatted_total
+            }
+        }
+        purchase_unit["items"] = items
 
     return {
         "intent": "CAPTURE",
-        "purchase_units": [
-            {
-                "amount": {
-                    "currency_code": "USD",
-                    "value": formatted_total,
-                    "breakdown": {
-                        "item_total": {
-                            "currency_code": "USD",
-                            "value": formatted_total
-                        }
-                    }
-                },
-                "items": items
-            }
-        ]
+        "purchase_units": [purchase_unit]
     }
 
 # --- CLIENTSIDE CALLBACK: CONDITIONALLY MOUNT PAYPAL ---
@@ -945,8 +950,6 @@ def create_order():
         return response
 
     access_token = get_paypal_access_token()
-    payload = request.get_json() or {}
-    amount_value = payload.get("amount", "50.00")
 
     headers = {
         "Content-Type": "application/json",
@@ -960,6 +963,10 @@ def create_order():
     )
 
     res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=payload, headers=headers)
+    #Log specific PayPal API error details to PythonAnywhere error log
+    if res.status_code not in (200, 201):
+        print(f"PayPal Order Creation Failed ({res.status_code}):", res.text)
+
     return jsonify(res.json()), res.status_code
 
 @app.server.route('/api/paypal/capture-order/<order_id>', methods=['POST', 'OPTIONS'], strict_slashes=False)
@@ -971,8 +978,6 @@ def capture_order(order_id):
     }
     res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders/{order_id}/capture", headers=headers)
 
-    print(f"[CAPTURE DEBUG] Status: {res.status_code}")
-    print(f"[CAPTURE DEBUG] Body: {res.text}")
     return jsonify(res.json()), res.status_code
 
 @app.server.before_request
