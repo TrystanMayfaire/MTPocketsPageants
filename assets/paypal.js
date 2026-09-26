@@ -16,8 +16,11 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                 return "PayPal SDK Missing";
             }
 
-            const amount = parseFloat(validation_data.amount) || 0;
-            if (amount <= 0) return "Invalid Amount";
+            // Extract order choices
+            const orderData = validation_data.order_data || {};
+            if (!orderData.division) {
+                return "Form Incomplete (Division Required)";
+            }
 
             paypal.Buttons({
                 style: {
@@ -33,14 +36,18 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            amount: amount.toFixed(2)
+                            selection_data: orderData
                         })
                     })
                     .then(function(res) {
                         return res.json();
                     })
-                    .then(function(orderData) {
-                        return orderData.id; // Returns the order ID from your Flask backend to PayPal's SDK
+                    .then(function(orderResponse) {
+                        if (orderResponse.error || !orderResponse.id) {
+                            console.error("Error creating PayPal order:", orderResponse);
+                            throw new Error(orderResponse.message || "Failed to create order");
+                        }
+                        return orderResponse.id; // Return PayPal order ID to the SDK
                     });
                 },
                 onApprove: function(data, actions) {
@@ -64,10 +71,15 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                                 payerGivenName = details.payer.name.given_name || "";
                             }
 
+                            // Extract the captured dollar amount directly from PayPal's response
+                            const capturedAmount = details.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value
+                                                || details.purchase_units?.[0]?.amount?.value
+                                                || "0.00";
+
                             const payload = {
                                 orderID: data.orderID,
                                 payerID: data.payerID,
-                                amount: amount.toFixed(2),
+                                amount: capturedAmount,
                                 payerName: payerGivenName
                             };
 
