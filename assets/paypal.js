@@ -53,6 +53,17 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     });
                 },
                 onApprove: function(data, actions) {
+                    const container = document.getElementById("paypal-button-container");
+                    if (container) {
+                        container.innerHTML = `
+                            <div class="alert alert-warning text-center py-3 shadow-sm my-3" role="alert">
+                                <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+                                <strong>Payment approved! Finalizing your registration...</strong>
+                                <div class="small text-muted mt-1">Please do not refresh or close this page.</div>
+                            </div>
+                        `;
+                    }
+
                     return fetch('/pageant/api/paypal/capture-order/' + data.orderID, {
                         method: 'POST',
                         headers: {
@@ -102,6 +113,16 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                                     storeEl.dispatchEvent(new Event('change', {bubbles: true}));
                                 }
                             }
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error("Capture Error:", err);
+                        if (container) {
+                            container.innerHTML = `
+                                <div class="alert alert-danger text-center my-3">
+                                    There was an error processing your payment. Please refresh and try again or contact support.
+                                </div>
+                            `;
                         }
                     });
                 },
