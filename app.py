@@ -884,29 +884,7 @@ def create_order():
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         return response
 
-    client_id = os.getenv('PAYPAL_CLIENT_ID')
-    client_secret = os.getenv('PAYPAL_CLIENT_SECRET')
-
-    # Debug 1: Confirm credentials are loaded
-    print(f"[DEBUG] Client ID present: {bool(client_id)}, Secret present: {bool(client_secret)}")
-
-    auth_response = requests.post(
-        'https://api-m.sandbox.paypal.com/v1/oauth2/token',
-        auth=(client_id, client_secret) if client_id and client_secret else None,
-        data={'grant_type': 'client_credentials'},
-        headers={'Accept': 'application/json', 'Accept-Language': 'en_US'}
-    )
-
-    # Debug 2: Log PayPal OAuth response
-    print(f"[DEBUG] PayPal Auth Status: {auth_response.status_code}")
-    print(f"[DEBUG] PayPal Auth Response: {auth_response.text}")
-
-    if auth_response.status_code != 200:
-        return jsonify({"error": "Failed to authenticate with PayPal", "details": auth_response.json()}), 401
-
-    access_token = auth_response.json().get('access_token')
-
-    #access_token = get_paypal_access_token()
+    access_token = get_paypal_access_token()
     payload = request.get_json() or {}
     amount_value = payload.get("amount", "50.00")
 
@@ -924,10 +902,6 @@ def create_order():
         }]
     }
     res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=data, headers=headers)
-
-    print(f"[DEBUG] PayPal Order Status: {res.status_code}")
-    print(f"[DEBUG] PayPal Order Response: {res.text}")
-
     return jsonify(res.json()), res.status_code
 
 @app.server.route('/api/paypal/capture-order/<order_id>', methods=['POST', 'OPTIONS'], strict_slashes=False)
@@ -938,6 +912,9 @@ def capture_order(order_id):
         "Authorization": f"Bearer {access_token}"
     }
     res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders/{order_id}/capture", headers=headers)
+
+    print(f"[CAPTURE DEBUG] Status: {res.status_code}")
+    print(f"[CAPTURE DEBUG] Body: {res.text}")
     return jsonify(res.json()), res.status_code
 
 @app.server.before_request
