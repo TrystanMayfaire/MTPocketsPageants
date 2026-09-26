@@ -1,7 +1,7 @@
 import io
-import json
 import re
 import os
+import json
 import colorsys
 from PIL import Image
 from dotenv import load_dotenv
@@ -11,11 +11,40 @@ from googleapiclient.http import MediaIoBaseDownload
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-dotenv_path = os.path.join(BASE_DIR, "secrets", ".env")
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
-FOLDER_NAME = "Current_Pageant"
+
+possible_env_paths = [
+    os.path.join(BASE_DIR, "secrets", ".env"),
+    os.path.join(BASE_DIR, ".env"),
+    "/home/mtpocketstheatre/secrets/.env",
+    os.path.expanduser("~/secrets/.env")
+]
+
+env_loaded = False
+for env_path in possible_env_paths:
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        print(f"Loaded environment variables from: {env_path}")
+        env_loaded = True
+        break
+
+if not env_loaded:
+    print("Warning: Could not find a .env file in expected locations.")
+
 SERVICE_ACCOUNT_FILE = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+
+# Fallback: if env variable wasn't set, explicitly search /home/mtpocketstheatre/secrets/
+if not SERVICE_ACCOUNT_FILE or not os.path.exists(SERVICE_ACCOUNT_FILE):
+    fallback_json = "/home/mtpocketstheatre/secrets/pageant-service-account.json"
+    if os.path.exists(fallback_json):
+        SERVICE_ACCOUNT_FILE = fallback_json
+        print(f"Auto-detected Service Account JSON at: {SERVICE_ACCOUNT_FILE}")
+
+if not SERVICE_ACCOUNT_FILE or not os.path.exists(SERVICE_ACCOUNT_FILE):
+    raise FileNotFoundError(
+        f"Could not locate Google Service Account JSON file. Checked path: {SERVICE_ACCOUNT_FILE}"
+    )
+
+FOLDER_NAME = "Current_Pageant"
 CONFIG_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "config.json")
 FLYER_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "flyer.jpg")
 CSS_OUTPUT_PATH = os.path.join(BASE_DIR, "assets", "custom.css")
