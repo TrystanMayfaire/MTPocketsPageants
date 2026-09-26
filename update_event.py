@@ -491,7 +491,13 @@ def get_authorized_http(creds):
     )
 
     if proxy_url:
-        proxy_info = httplib2.proxy_info_from_url(proxy_url)
+        import urllib.parse
+        parsed = urllib.parse.urlparse(proxy_url)
+        proxy_info = httplib2.ProxyInfo(
+            proxy_type=httplib2.socks.PROXY_TYPE_HTTP,
+            proxy_host=parsed.hostname,
+            proxy_port=parsed.port
+        )
         http_client = httplib2.Http(proxy_info=proxy_info)
     else:
         http_client = httplib2.Http()
