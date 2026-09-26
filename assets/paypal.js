@@ -37,20 +37,20 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                 },
                 onApprove: function(data, actions) {
                     return actions.order.capture().then(function(details) {
-                        if (window.dash_clientside && window.dash_clientside.set_props) {
-                            window.dash_clientside.set_props("paypal-transaction-store", {
-                                data: {
+                        console.log('Capture successful:', details);
+                        if (details.status === 'COMPLETED') {
+                            const storeEl = document.getElementById('paypal-transaction-store');
+                            storeEl.value = JSON.stringify({
                                     orderID: data.orderID,
                                     payerID: data.payerID,
                                     amount: amount.toFixed(2),
                                     payerName: details.payer ? details.payer.name.given_name : ""
-                                }
                             });
                         }
                     });
                 },
                 onError: function(err) {
-                    console.error('PayPal Error:', err);
+                    console.error('PayPal Checkout Error:', err);
                 }
             }).render('#paypal-button-container');
 
