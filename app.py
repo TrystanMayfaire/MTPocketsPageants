@@ -106,7 +106,7 @@ def render_event_info(config):
             accordion_items.append(
                 html.Details(
                     className="mb-2 border rounded overflow-hidden bg-white shadow-sm",
-                    open=(idx == 0),  # General Information / 1st section starts OPEN
+                    open=(idx == 0),
                     children=[
                         html.Summary(
                             sec.get("title", f"Section {idx+1}"),
@@ -141,7 +141,6 @@ def render_dynamic_form_fields(fields):
         is_required = f.get("required", False)
         field_type = f.get("type", "text")
 
-        # Required field visual indicator (*)
         label_children = [
             label_text,
             html.Span(" *" if is_required else "", style={"color": "red", "fontWeight": "bold"})
@@ -154,11 +153,9 @@ def render_dynamic_form_fields(fields):
         if f.get("description"):
             field_children.append(html.P(f["description"], className="small text-muted mb-1"))
 
-        # Derive placeholder text
         clean_label = label_text.split("(")[0].replace("*", "").strip()
         placeholder_text = f.get("placeholder", f"Enter {clean_label}...")
 
-        # 1. Contact Email Input
         if field_type == "email":
             field_children.append(
                 dbc.Input(
@@ -169,7 +166,6 @@ def render_dynamic_form_fields(fields):
                 )
             )
 
-        # 2. Date of Birth Input
         elif field_type == "date":
             field_children.append(
                 dbc.Input(
@@ -179,7 +175,6 @@ def render_dynamic_form_fields(fields):
                 )
             )
 
-        # 3. Phone Number Input
         elif field_type == "tel":
             field_children.append(
                 dbc.Input(
@@ -190,7 +185,6 @@ def render_dynamic_form_fields(fields):
                 )
             )
 
-        # 4. Headshot Photo Upload Component
         elif field_type == "file":
             field_children.append(
                 html.Div([
@@ -217,7 +211,6 @@ def render_dynamic_form_fields(fields):
                 ])
             )
 
-        # 5. Multiline Text Area
         elif field_type == "textarea":
             field_children.append(
                 dcc.Textarea(
@@ -228,7 +221,6 @@ def render_dynamic_form_fields(fields):
                 )
             )
 
-        # 6. Dropdown Options
         elif field_type == "dropdown":
             field_children.append(
                 dcc.Dropdown(
@@ -240,7 +232,6 @@ def render_dynamic_form_fields(fields):
                 )
             )
 
-        # 7. Radio Buttons
         elif field_type == "radio":
             field_children.append(
                 dbc.RadioItems(
@@ -250,7 +241,6 @@ def render_dynamic_form_fields(fields):
                 )
             )
 
-        # 8. Standard Text Input Fallback
         else:
             field_children.append(
                 dcc.Input(
@@ -548,19 +538,16 @@ def calculate_total_fee(selected_division, selected_addons):
     State({"type": "form-upload", "id": ALL}, "id")
 )
 def validate_form_and_payment(input_values, upload_contents, selected_division, disclaimer_val, fee_str, input_ids, upload_ids):
-    # 1. Parse total numerical fee
     try:
         amount = float(str(fee_str).replace("$", "").strip())
     except (ValueError, TypeError, AttributeError):
         amount = 0.0
 
-    # 2. Map inputs and upload contents by ID
     input_map = {item["id"]: val for item, val in zip(input_ids, input_values)}
     upload_map = {item["id"]: val for item, val in zip(upload_ids, upload_contents)}
 
     missing_reasons = []
 
-    # 3. Check mandatory form fields from EVENT_CONFIG
     for field in EVENT_CONFIG.get("form_fields", []):
         if field.get("required"):
             fid = field["id"]
@@ -572,11 +559,9 @@ def validate_form_and_payment(input_values, upload_contents, selected_division, 
                 if val is None or str(val).strip() == "":
                     missing_reasons.append(f"Fill out '{field['label']}'")
 
-    # 4. Check Division Selection
     if not selected_division:
         missing_reasons.append("Select a Division")
 
-    # 5. Check Rules & Disclaimer Agreement
     disclaimer_cfg = EVENT_CONFIG.get("disclaimer")
     if disclaimer_cfg:
         disclaimer_agreed = False
@@ -589,7 +574,6 @@ def validate_form_and_payment(input_values, upload_contents, selected_division, 
 
     is_valid = len(missing_reasons) == 0
 
-    # 6. Generate dynamic status banner UI
     if is_valid:
         notice = html.Div([
             html.Div("✓ Application Complete", className="badge bg-success mb-2 p-2 w-100 fs-6"),
@@ -634,6 +618,7 @@ def toggle_registration_view(is_completed):
 
 @app.callback(
     Output("transaction-completed-store", "data", allow_duplicate=True),
+    Output("paypal-transaction-store", "data", allow_duplicate=True),
     Output({"type": "form-input", "id": ALL}, "value"),
     Output({"type": "form-upload", "id": ALL}, "contents"),
     Output("division-select", "value"),
@@ -646,16 +631,11 @@ def toggle_registration_view(is_completed):
     prevent_initial_call=True
 )
 def reset_form_and_view(n_clicks, form_input_ids, upload_ids, addon_ids):
-    # 1. Reset all dynamic form inputs
     reset_inputs = [None] * len(form_input_ids)
-
-    # 2. Reset uploaded files
     reset_uploads = [None] * len(upload_ids)
 
-    # 3. Reset division dropdown to initial selection
     default_division = EVENT_CONFIG["divisions"][0]["label"] if EVENT_CONFIG.get("divisions") else None
 
-    # 4. Reset optional category radio choices to default selections
     default_addons = []
     for addon in EVENT_CONFIG.get("addons", []):
         default_val = addon["options"][0]["label"] if addon.get("options") else None
@@ -665,10 +645,9 @@ def reset_form_and_view(n_clicks, form_input_ids, upload_ids, addon_ids):
                 break
         default_addons.append(default_val)
 
-    # 5. Clear disclaimer agreement
     reset_disclaimer = None
 
-    return False, reset_inputs, reset_uploads, default_division, default_addons, reset_disclaimer
+    return False, None, reset_inputs, reset_uploads, default_division, default_addons, reset_disclaimer
 
 @app.callback(
     Output("transaction-completed-store", "data", allow_duplicate=True),
@@ -686,6 +665,12 @@ def handle_payment_success(trans_data, input_values, upload_contents, selected_d
     if not trans_data:
         return False
 
+    if isinstance(trans_data, str):
+        try:
+            trans_data = json.loads(trans_data)
+        except Exception:
+            pass
+
     input_map = {item["id"]: val for item, val in zip(input_ids, input_values)}
     upload_map = {item["id"]: val for item, val in zip(upload_ids, upload_contents)}
 
@@ -702,6 +687,7 @@ def handle_payment_success(trans_data, input_values, upload_contents, selected_d
     return True
 
 # ---- GOOGLE SERVICES API HELPER FUNCTIONS ----
+
 def get_authorized_http(creds):
     """Configures httplib2 to route through PythonAnywhere proxy if environment variables are present."""
     proxy_url = (
@@ -748,8 +734,6 @@ def get_google_services():
         print(f"[CRITICAL] Failed to load service account credentials: {e}")
         return None, None
 
-
-
     authorized_http = get_authorized_http(creds)
     drive_service = build("drive", "v3", http=authorized_http)
     sheets_service = build("sheets", "v4", http=authorized_http)
@@ -776,7 +760,6 @@ def upload_headshot_to_drive(drive_service, folder_id, base64_contents, contesta
             supportsAllDrives=True
         ).execute()
 
-        # Set permissions so anyone with link can view image in Google Sheet
         drive_service.permissions().create(
             fileId=uploaded_file["id"],
             body={"role": "reader", "type": "anyone"},
@@ -809,11 +792,13 @@ def save_registration_to_sheet(transaction_details, form_input_data, upload_data
             contestant_name = str(val)
             break
 
-    # Upload Headshot to Drive
+    # Upload Headshot to Drive (checks all upload fields if content is present)
     headshot_url = ""
     for fid, contents in upload_data.items():
-        if fid == "headshot_upload" and contents:
+        if contents:
             headshot_url = upload_headshot_to_drive(drive_service, headshot_folder_id, contents, contestant_name)
+            if headshot_url:
+                break
 
     # Build row mapping based on headers
     row_map = {
@@ -828,7 +813,7 @@ def save_registration_to_sheet(transaction_details, form_input_data, upload_data
     # Add dynamic form fields
     for field in EVENT_CONFIG.get("form_fields", []):
         fid = field["id"]
-        if fid != "headshot_upload":
+        if field.get("type") != "file":
             row_map[field["label"]] = form_input_data.get(fid, "")
 
     # Add dynamic add-ons
@@ -836,6 +821,9 @@ def save_registration_to_sheet(transaction_details, form_input_data, upload_data
     if selected_addons and len(selected_addons) == len(addons_config):
         for addon_group, selected_val in zip(addons_config, selected_addons):
             row_map[f"Add-On: {addon_group['title']}"] = selected_val or ""
+
+    if not headers:
+        headers = list(row_map.keys())
 
     # Assemble row matching exact column order in Google Sheet
     row_values = [row_map.get(col, "") for col in headers]

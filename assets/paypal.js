@@ -56,17 +56,37 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     .then(function(details) {
                         console.log('Capture successful:', details);
                         if (details.status === 'COMPLETED') {
-                            const storeEl = document.getElementById('paypal-transaction-store');
-                            if (storeEl) {
-                                storeEl.value = JSON.stringify({
-                                    orderID: data.orderID,
-                                    payerID: data.payerID,
-                                    amount: amount.toFixed(2),
-                                    payerName: details.payer && details.payer.name ? details.payer.name.given_name : ""
-                                });
+                            // Extract buyer given name across PayPal API v2 schemas
+                            let payerGivenName = "";
+                            if (details.payment_source && details.payment_source.paypal && details.payment_source.paypal.name) {
+                                payerGivenName = details.payment_source.paypal.name.given_name || "";
+                            } else if (details.payer && details.payer.name) {
+                                payerGivenName = details.payer.name.given_name || "";
+                            }
 
-                                // Optional: Dispatch an event if Dash needs to detect the store value change
-                                storeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                            const payload = {
+                                orderID: data.orderID,
+                                payerID: data.payerID,
+                                amount: amount.toFixed(2),
+                                payerName: payerGivenName
+                            };
+
+                            // Update dcc.Store via Dash clientside API
+                            if (window.dash_clientside && typeof window.dash_clientside.set_props === 'function') {
+                                dash_clientside.set_props('paypal-transaction-store', {data: payload});
+                            } else {
+                                // Fallback for standard DOM input element
+                                const storeEl = document.getElementById('paypal-transaction-store');
+                                if (storeEl) {
+                                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+                                    if (nativeSetter) {
+                                        nativeSetter.call(storeEl, JSON.stringify(payload));
+                                    } else {
+                                        storeEl.value = JSON.stringify(payload);
+                                    }
+                                    storeEl.dispatchEvent(new Event('input', {bubbles: true}));
+                                    storeEl.dispatchEvent(new Event('change', {bubbles: true}));
+                                }
                             }
                         }
                     });
