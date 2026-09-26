@@ -529,7 +529,7 @@ def calculate_total_fee(selected_division, selected_addons):
         "addons": selected_addons
     }
 
-    return f"${total:.2f}", breakdown_items
+    return f"${total:.2f}", breakdown_items, selection_data
 
 # --- FORM & DISCLAIMER VALIDATION CALLBACK ---
 
