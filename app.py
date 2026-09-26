@@ -864,6 +864,7 @@ app.clientside_callback(
     Output("paypal-mount-status", "children"),
     Input("payment-validation-store", "data")
 )
+
 # PayPal Sandbox or Live API Base URL
 PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
 
@@ -874,8 +875,11 @@ def get_paypal_access_token():
     response = requests.post(f"{PAYPAL_API_BASE}/v1/oauth2/token", auth=auth, headers=headers, data=data)
     return response.json().get("access_token")
 
-@app.server.route('/api/paypal/create-order', methods=['POST'])
+@app.server.route('/api/paypal/create-order', methods=['POST', 'OPTIONS'])
 def create_order():
+    if request.method == 'OPTIONS':
+        return '', 200
+
     access_token = get_paypal_access_token()
     payload = request.get_json() or {}
     amount_value = payload.get("amount", "50.00")
