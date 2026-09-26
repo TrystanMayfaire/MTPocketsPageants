@@ -483,15 +483,15 @@ def sanitize_field_id(title):
 # --- MAIN SYNC PIPELINE ---
 def get_authorized_http(creds):
     """Configures httplib2 to route through PythonAnywhere proxy if environment variables are present."""
-    proxy_url = os.environ.get("http_proxy") or os.environ.get("https_proxy")
+    proxy_url = (
+        os.environ.get("http_proxy")
+        or os.environ.get("https_proxy")
+        or os.environ.get("HTTP_PROXY")
+        or os.environ.get("HTTPS_PROXY")
+    )
+
     if proxy_url:
-        import urllib.parse
-        parsed = urllib.parse.urlparse(proxy_url)
-        proxy_info = httplib2.ProxyInfo(
-            proxy_type=httplib2.socks.PROXY_TYPE_HTTP,
-            proxy_host=parsed.hostname,
-            proxy_port=parsed.port
-        )
+        proxy_info = httplib2.proxy_info_from_url(proxy_url)
         http_client = httplib2.Http(proxy_info=proxy_info)
     else:
         http_client = httplib2.Http()
