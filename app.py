@@ -4,8 +4,10 @@ import json
 import dash
 import base64
 import httplib2
+import requests
 import google_auth_httplib2
 from datetime import datetime
+from flask import request, jsonify
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -68,6 +70,7 @@ else:
 
 # PayPal Client ID
 PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "test")
+PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "test")
 
 GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/drive",
@@ -84,7 +87,8 @@ app = dash.Dash(
     external_scripts=[
         "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js",
         f"https://www.paypal.com/sdk/js?client-id={PAYPAL_CLIENT_ID}&currency=USD"
-    ]
+    ],
+    suppress_callback_exceptions=True,
 )
 
 server = app.server
@@ -860,6 +864,48 @@ app.clientside_callback(
     Output("paypal-mount-status", "children"),
     Input("payment-validation-store", "data")
 )
+# PayPal Sandbox or Live API Base URL
+PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
+
+def get_paypal_access_token():
+    auth = (PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET)
+    headers = {"Accept": "application/json", "Accept-Language": "en_US"}
+    data = {"grant_type": "client_credentials"}
+    response = requests.post(f"{PAYPAL_API_BASE}/v1/oauth2/token", auth=auth, headers=headers, data=data)
+    return response.json().get("access_token")
+
+@app.server.route('/api/paypal/create-order', methods=['POST'])
+def create_order():
+    access_token = get_paypal_access_token()
+    payload = request.get_json() or {}
+    amount_value = payload.get("amount", "50.00")
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {access_token}"
+    }
+    data = {
+        "intent": "CAPTURE",
+        "purchase_units": [{
+            "amount": {
+                "currency_code": "USD",
+                "value": amount_value
+            }
+        }]
+    }
+    res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=data, headers=headers)
+    return jsonify(res.json()), res.status_code
+
+@app.server.route('/api/paypal/capture-order/<order_id>', methods=['POST'])
+def capture_order(order_id):
+    access_token = get_paypal_access_token()
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {access_token}"
+    }
+    res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders/{order_id}/capture", headers=headers)
+    return jsonify(res.json()), res.status_code
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -27,25 +27,47 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     label:  'paypal'
                 },
                 createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: {
-                                value: amount.toFixed(2)
-                            }
-                        }]
+                    return fetch('/api/paypal/create-order', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            amount: amount.toFixed(2)
+                        })
+                    })
+                    .then(function(res) {
+                        return res.json();
+                    })
+                    .then(function(orderData) {
+                        return orderData.id; // Returns the order ID from your Flask backend to PayPal's SDK
                     });
                 },
                 onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
+                    return fetch('/api/paypal/capture-order/' + data.orderID, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(function(res) {
+                        return res.json();
+                    })
+                    .then(function(details) {
                         console.log('Capture successful:', details);
                         if (details.status === 'COMPLETED') {
                             const storeEl = document.getElementById('paypal-transaction-store');
-                            storeEl.value = JSON.stringify({
+                            if (storeEl) {
+                                storeEl.value = JSON.stringify({
                                     orderID: data.orderID,
                                     payerID: data.payerID,
                                     amount: amount.toFixed(2),
-                                    payerName: details.payer ? details.payer.name.given_name : ""
-                            });
+                                    payerName: details.payer && details.payer.name ? details.payer.name.given_name : ""
+                                });
+
+                                // Optional: Dispatch an event if Dash needs to detect the store value change
+                                storeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
                         }
                     });
                 },
