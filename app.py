@@ -707,6 +707,9 @@ def get_authorized_http(creds):
         or os.environ.get("HTTPS_PROXY")
     )
 
+    if not proxy_url and (os.path.exists("/etc/pythonanywhere") or "PYTHONANYWHERE_DOMAIN" in os.environ):
+        proxy_url = "http://proxy.server:3128"
+
     if proxy_url:
         import urllib.parse
         parsed = urllib.parse.urlparse(proxy_url)
@@ -724,9 +727,25 @@ def get_authorized_http(creds):
 def get_google_services():
     service_account_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if not service_account_file or not os.path.exists(service_account_file):
-        print("ERROR: Service account credentials file missing.")
+        fallback_path = "/home/mtpocketstheatre/secrets/pageant_service_account.json"
+        if os.path.exists(fallback_path):
+            service_account_file = fallback_path
+
+    if not service_account_file or not os.path.exists(service_account_file):
+        print(f"[CRITICAL] Google credentials file not found. Checked path: {service_account_file}")
         return None, None
-    creds = service_account.Credentials.from_service_account_file(service_account_file, scopes=GOOGLE_SCOPES)
+
+    try:
+        creds = service_account.Credentials.from_service_account_file(
+            service_account_file,
+            scopes=GOOGLE_SCOPES
+        )
+    except Exception as e:
+        print(f"[CRITICAL] Failed to load service account credentials: {e}")
+        return None, None
+
+
+
     authorized_http = get_authorized_http(creds)
     drive_service = build("drive", "v3", http=authorized_http)
     sheets_service = build("sheets", "v4", http=authorized_http)
