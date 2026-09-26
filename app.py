@@ -875,7 +875,7 @@ def get_paypal_access_token():
     response = requests.post(f"{PAYPAL_API_BASE}/v1/oauth2/token", auth=auth, headers=headers, data=data)
     return response.json().get("access_token")
 
-@app.server.route(REQUESTS_PREFIX + 'api/paypal/create-order', methods=['POST', 'OPTIONS'])
+@app.server.route(REQUESTS_PREFIX + 'api/paypal/create-order', methods=['POST', 'OPTIONS'], strict_slashes=False)
 def create_order():
     if request.method == 'OPTIONS':
         return '', 200
@@ -900,7 +900,7 @@ def create_order():
     res = requests.post(f"{PAYPAL_API_BASE}/v2/checkout/orders", json=data, headers=headers)
     return jsonify(res.json()), res.status_code
 
-@app.server.route(REQUESTS_PREFIX + 'api/paypal/capture-order/<order_id>', methods=['POST'])
+@app.server.route(REQUESTS_PREFIX + 'api/paypal/capture-order/<order_id>', methods=['POST', 'OPTIONS'], strict_slashes=False)
 def capture_order(order_id):
     access_token = get_paypal_access_token()
     headers = {
