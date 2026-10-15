@@ -330,158 +330,233 @@ def sanitize_id(title):
     clean = re.sub(r'[^a-zA-Z0-9\s]', '', title).strip().lower()
     return re.sub(r'\s+', '_', clean)
 
-# --- APP LAYOUT ---
 
-app.layout = html.Div(children=[
+EXPIRATION_FILE_PATH = os.path.join(BASE_DIR, "expiration_date.txt")
 
-    # Form Validation & Transaction Completion Stores
-    dcc.Store(id="payment-validation-store"),
-    dcc.Store(id="transaction-completed-store", data=False),
-    dcc.Store(id="paypal-transaction-store"),
-    dcc.Store(id="order-selection-store"),
+def is_registration_expired():
+    """Checks if the current system date/time has passed the date in expiration_date.txt."""
+    if not os.path.exists(EXPIRATION_FILE_PATH):
+        return False  # If file doesn't exist, keep registration open by default
 
-    # 1. Header Banner
-    html.Div(className="pageant-header text-center mb-4 py-4", children=[
-        html.Div(className="container", children=[
-            html.H1(EVENT_CONFIG.get("title", "Pageant Registration"), className="display-6 fw-bold mb-1"),
-            html.P("M.T. Pockets Theatre, Inc. Fundraiser Registration", className="lead mb-0")
-        ])
-    ]),
+    try:
+        with open(EXPIRATION_FILE_PATH, "r", encoding="utf-8") as f:
+            date_str = f.read().strip()
 
-    html.Div(className="container pb-5", children=[
+        if not date_str:
+            return False
 
-        # 2. Hero Section: Flyer + Event Details Accordion
-        html.Div(className="row g-4 mb-5", children=[
-            html.Div(className="col-lg-5", children=[
-                html.Div(className="flyer-card", children=[
-                    html.Img(
-                        src=app.get_asset_url(EVENT_CONFIG.get("flyer_image", "flyer.jpg")),
-                        className="flyer-img",
-                        alt="Event Flyer"
-                    )
-                ])
-            ]),
-            html.Div(className="col-lg-7", children=[
-                html.Div(className="card card-custom h-100", children=[
-                    html.Div(className="card-header card-header-primary", children=[
-                        html.H5("Event Details & Information", className="mb-0 fs-5")
-                    ]),
-                    html.Div(className="card-body event-description-box", children=[
-                        render_event_info(EVENT_CONFIG)
-                    ])
-                ])
+        # Support YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats
+        try:
+            expiration_dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            # Defaults to 23:59:59 on the expiration date if time is omitted
+            expiration_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+
+        return datetime.now() > expiration_dt
+
+    except Exception as e:
+        print(f"Error reading expiration_date.txt: {e}")
+        return False
+
+
+def build_closed_registration_layout():
+    """Layout displayed when registration has closed."""
+    return html.Div(children=[
+        # Stores required to prevent callback errors
+        dcc.Store(id="payment-validation-store"),
+        dcc.Store(id="transaction-completed-store", data=False),
+        dcc.Store(id="paypal-transaction-store"),
+        dcc.Store(id="order-selection-store"),
+
+        # Header Banner
+        html.Div(className="pageant-header text-center mb-4 py-4", children=[
+            html.Div(className="container", children=[
+                html.H1(EVENT_CONFIG.get("title", "Pageant Registration"), className="display-6 fw-bold mb-1"),
+                html.P("M.T. Pockets Theatre, Inc. Fundraiser Registration", className="lead mb-0")
             ])
         ]),
 
-        # 3. Main Registration & Checkout Section
-        html.Div(id="main-registration-container", children=[
-
-            # Success / Reset Confirmation Banner (Hidden by default)
-            html.Div(
-                id="success-reset-row",
-                className="row justify-content-center my-4",
-                style={"display": "none"},
-                children=[
-                    html.Div(className="col-lg-8 text-center", children=[
-                        html.Div(className="card card-custom p-5 shadow-sm border-0", children=[
-                            html.Div(className="mb-4", children=[
-                                html.H2("🎉 Registration Complete!", className="fw-bold text-success mb-3"),
-                                html.P(
-                                    "Thank you! Your pageant registration and payment have been successfully submitted.",
-                                    className="lead text-secondary mb-0"
-                                )
-                            ]),
-                            html.Div(children=[
-                                dbc.Button(
-                                    "Submit another registration",
-                                    id="reset-registration-btn",
-                                    color="primary",
-                                    size="lg",
-                                    className="px-4 py-2 fw-bold"
-                                )
-                            ])
-                        ])
-                    ])
-                ]
-            ),
-
-            # Registration Form and Checkout Columns (Visible by default)
-            html.Div(
-                id="form-and-checkout-row",
-                className="row g-4",
-                children=[
-
-                    # Left Column (lg-8): Form
-                    html.Div(className="col-lg-8", children=[
-
-                        # Participant Details Card
-                        html.Div(className="card card-custom mb-4", children=[
-                            html.Div(className="card-header card-header-primary", children=[
-                                html.H5("1. Contestant & Contact Information", className="mb-0 fs-5")
-                            ]),
-                            html.Div(className="card-body", children=render_dynamic_form_fields(EVENT_CONFIG.get("form_fields", [])))
+        # Registration Closed Card
+        html.Div(className="container pb-5", children=[
+            html.Div(className="row justify-content-center my-5", children=[
+                html.Div(className="col-lg-8 text-center", children=[
+                    dbc.Card(
+                        dbc.CardBody([
+                            html.H3("Registration Closed", className="card-title text-danger mb-3 fw-bold"),
+                            html.P(
+                                "Online pageant registration is now closed for this event. "
+                                "We look forward to seeing you at future pageants!",
+                                className="card-text lead text-secondary mb-0"
+                            )
                         ]),
-
-                        # Age Division Selection Card
-                        html.Div(className="card card-custom mb-4", children=[
-                            html.Div(className="card-header card-header-primary", children=[
-                                html.H5("2. Select Age Division *", className="mb-0 fs-5")
-                            ]),
-                            html.Div(className="card-body", children=[
-                                html.P(f"Main Event Entry Fee: ${EVENT_CONFIG.get('base_fee', 50.0):.2f}", className="small fw-bold text-muted mb-2"),
-                                dcc.Dropdown(
-                                    id="division-select",
-                                    options=[
-                                        {"label": f"{div['label']} — ${div['price']:.2f}", "value": div['label']}
-                                        for div in EVENT_CONFIG.get("divisions", [])
-                                    ],
-                                    value=EVENT_CONFIG["divisions"][0]["label"] if EVENT_CONFIG.get("divisions") else None,
-                                    clearable=False,
-                                    className="form-select-lg"
-                                )
-                            ])
-                        ]),
-
-                        # Optional Add-Ons Section
-                        render_addons_section(EVENT_CONFIG.get("addons", [])),
-
-                        # Rules & Disclaimer Agreement Card
-                        render_disclaimer(EVENT_CONFIG.get("disclaimer"))
-                    ]),
-
-                    # Right Column (lg-4): Sticky Checkout Summary & Payment
-                    html.Div(className="col-lg-4", children=[
-                        html.Div(className="sticky-top", style={"top": "20px"}, children=[
-                            html.Div(className="card checkout-card p-4 text-center mb-3", children=[
-                                html.H5("Registration Summary", className="text-uppercase tracking-wide text-white-50 mb-2 fs-6"),
-
-                                # Fee Breakdown Output
-                                html.Div(id="fee-breakdown-display", className="text-start mb-3 small text-white-50 border-bottom border-secondary pb-2"),
-
-                                # Fee Total Display
-                                html.Div("Total Amount Due", className="small text-uppercase text-white-50 fw-semibold"),
-                                html.Div(id="fee-total-display", className="total-amount-display my-1", children="$50.00"),
-
-                                # Dynamic Status Banner
-                                html.Div(id="payment-notice-display", className="my-3"),
-
-                                # Mount Point for PayPal Smart Payment Buttons
-                                html.Div(id="paypal-button-container", style={"minHeight": "150px"}),
-
-                                # Hidden Status Output for Clientside Callback
-                                html.Div(id="paypal-mount-status", style={"display": "none"})
-                            ]),
-
-                            html.Div(className="text-center text-muted small", children=[
-                                "M.T. Pockets Theatre, Inc. is a registered 501(c)(3) non-profit organization."
-                            ])
-                        ])
-                    ])
-                ]
-            )
+                        className="shadow-sm p-5 border-0 rounded-3"
+                    )
+                ])
+            ])
         ])
     ])
-])
+
+def build_active_registration_layout():
+    return html.Div(children=[
+
+        # Form Validation & Transaction Completion Stores
+        dcc.Store(id="payment-validation-store"),
+        dcc.Store(id="transaction-completed-store", data=False),
+        dcc.Store(id="paypal-transaction-store"),
+        dcc.Store(id="order-selection-store"),
+
+        # 1. Header Banner
+        html.Div(className="pageant-header text-center mb-4 py-4", children=[
+            html.Div(className="container", children=[
+                html.H1(EVENT_CONFIG.get("title", "Pageant Registration"), className="display-6 fw-bold mb-1"),
+                html.P("M.T. Pockets Theatre, Inc. Fundraiser Registration", className="lead mb-0")
+            ])
+        ]),
+
+        html.Div(className="container pb-5", children=[
+
+            # 2. Hero Section: Flyer + Event Details Accordion
+            html.Div(className="row g-4 mb-5", children=[
+                html.Div(className="col-lg-5", children=[
+                    html.Div(className="flyer-card", children=[
+                        html.Img(
+                            src=app.get_asset_url(EVENT_CONFIG.get("flyer_image", "flyer.jpg")),
+                            className="flyer-img",
+                            alt="Event Flyer"
+                        )
+                    ])
+                ]),
+                html.Div(className="col-lg-7", children=[
+                    html.Div(className="card card-custom h-100", children=[
+                        html.Div(className="card-header card-header-primary", children=[
+                            html.H5("Event Details & Information", className="mb-0 fs-5")
+                        ]),
+                        html.Div(className="card-body event-description-box", children=[
+                            render_event_info(EVENT_CONFIG)
+                        ])
+                    ])
+                ])
+            ]),
+
+            # 3. Main Registration & Checkout Section
+            html.Div(id="main-registration-container", children=[
+
+                # Success / Reset Confirmation Banner (Hidden by default)
+                html.Div(
+                    id="success-reset-row",
+                    className="row justify-content-center my-4",
+                    style={"display": "none"},
+                    children=[
+                        html.Div(className="col-lg-8 text-center", children=[
+                            html.Div(className="card card-custom p-5 shadow-sm border-0", children=[
+                                html.Div(className="mb-4", children=[
+                                    html.H2("🎉 Registration Complete!", className="fw-bold text-success mb-3"),
+                                    html.P(
+                                        "Thank you! Your pageant registration and payment have been successfully submitted.",
+                                        className="lead text-secondary mb-0"
+                                    )
+                                ]),
+                                html.Div(children=[
+                                    dbc.Button(
+                                        "Submit another registration",
+                                        id="reset-registration-btn",
+                                        color="primary",
+                                        size="lg",
+                                        className="px-4 py-2 fw-bold"
+                                    )
+                                ])
+                            ])
+                        ])
+                    ]
+                ),
+
+                # Registration Form and Checkout Columns (Visible by default)
+                html.Div(
+                    id="form-and-checkout-row",
+                    className="row g-4",
+                    children=[
+
+                        # Left Column (lg-8): Form
+                        html.Div(className="col-lg-8", children=[
+
+                            # Participant Details Card
+                            html.Div(className="card card-custom mb-4", children=[
+                                html.Div(className="card-header card-header-primary", children=[
+                                    html.H5("1. Contestant & Contact Information", className="mb-0 fs-5")
+                                ]),
+                                html.Div(className="card-body", children=render_dynamic_form_fields(EVENT_CONFIG.get("form_fields", [])))
+                            ]),
+
+                            # Age Division Selection Card
+                            html.Div(className="card card-custom mb-4", children=[
+                                html.Div(className="card-header card-header-primary", children=[
+                                    html.H5("2. Select Age Division *", className="mb-0 fs-5")
+                                ]),
+                                html.Div(className="card-body", children=[
+                                    html.P(f"Main Event Entry Fee: ${EVENT_CONFIG.get('base_fee', 50.0):.2f}", className="small fw-bold text-muted mb-2"),
+                                    dcc.Dropdown(
+                                        id="division-select",
+                                        options=[
+                                            {"label": f"{div['label']} — ${div['price']:.2f}", "value": div['label']}
+                                            for div in EVENT_CONFIG.get("divisions", [])
+                                        ],
+                                        value=EVENT_CONFIG["divisions"][0]["label"] if EVENT_CONFIG.get("divisions") else None,
+                                        clearable=False,
+                                        className="form-select-lg"
+                                    )
+                                ])
+                            ]),
+
+                            # Optional Add-Ons Section
+                            render_addons_section(EVENT_CONFIG.get("addons", [])),
+
+                            # Rules & Disclaimer Agreement Card
+                            render_disclaimer(EVENT_CONFIG.get("disclaimer"))
+                        ]),
+
+                        # Right Column (lg-4): Sticky Checkout Summary & Payment
+                        html.Div(className="col-lg-4", children=[
+                            html.Div(className="sticky-top", style={"top": "20px"}, children=[
+                                html.Div(className="card checkout-card p-4 text-center mb-3", children=[
+                                    html.H5("Registration Summary", className="text-uppercase tracking-wide text-white-50 mb-2 fs-6"),
+
+                                    # Fee Breakdown Output
+                                    html.Div(id="fee-breakdown-display", className="text-start mb-3 small text-white-50 border-bottom border-secondary pb-2"),
+
+                                    # Fee Total Display
+                                    html.Div("Total Amount Due", className="small text-uppercase text-white-50 fw-semibold"),
+                                    html.Div(id="fee-total-display", className="total-amount-display my-1", children="$50.00"),
+
+                                    # Dynamic Status Banner
+                                    html.Div(id="payment-notice-display", className="my-3"),
+
+                                    # Mount Point for PayPal Smart Payment Buttons
+                                    html.Div(id="paypal-button-container", style={"minHeight": "150px"}),
+
+                                    # Hidden Status Output for Clientside Callback
+                                    html.Div(id="paypal-mount-status", style={"display": "none"})
+                                ]),
+
+                                html.Div(className="text-center text-muted small", children=[
+                                    "M.T. Pockets Theatre, Inc. is a registered 501(c)(3) non-profit organization."
+                                ])
+                            ])
+                        ])
+                    ]
+                )
+            ])
+        ])
+    ])
+
+def serve_layout():
+    if is_registration_expired():
+        return build_closed_registration_layout()
+    else:
+        return build_active_registration_layout()
+
+# --- APP LAYOUT ---
+
+app.layout = serve_layout
 
 # --- DYNAMIC FEE CALCULATION CALLBACK ---
 
@@ -946,6 +1021,12 @@ def create_order():
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         return response
+
+    if is_registration_expired():
+        return jsonify({
+            "error": "REGISTRATION_CLOSED",
+            "message": "Registration for this pageant is now closed."
+        }), 403
 
     access_token = get_paypal_access_token()
 
