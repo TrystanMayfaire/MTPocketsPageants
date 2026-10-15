@@ -32,6 +32,7 @@
             "content": "We would love a full audience to cheer for our fabulous contestants! There will be a $5 entry fee for spectators (contestants are free). We strive to provide a space where everyone feels comfortable and respected. As such, bad sportsmanship or bullying will NOT be tolerated. If any such incident is reported it will immediately be investigated and, if proven true, the offending contestant will be immediately disqualified without refund and asked to leave the premises.  Any spectators, parents/guardians, or other persons displaying bad sportsmanship or bullying will also be asked to leave the premises without refund. \nConcessions will be available for purchase."
         }
     ],
+    "expiration_date": "2026-10-14",
     "divisions": [
         {
             "label": "0-12 months",
@@ -231,7 +232,7 @@
         ],
         "required": false
     },
-    "spreadsheet_id": "1Ee3nhUHTwXPg2wuyn8HlV6BiHNp4culylrhlE5hIHps",
+    "spreadsheet_id": "1vEEhdSZrwsvLMa1mypj9UD6Ms3mNSCc-lIDkAeufbco",
     "headshot_folder_id": "19KSfFepWvqq-4UKJjEP50Ydw89V3fB5U",
     "sheet_headers": [
         "Timestamp",

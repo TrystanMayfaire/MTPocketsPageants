@@ -544,6 +544,7 @@ def sync_current_pageant():
 
     form_id = None
     image_file_id = None
+    expiration_date_str = None
 
     for item in items:
         mime = item.get("mimeType", "")
@@ -556,6 +557,22 @@ def sync_current_pageant():
         elif mime.startswith("image/") or name.lower().endswith((".jpg", ".jpeg", ".png")):
             image_file_id = item["id"]
             print(f"Found Flyer Graphic: '{name}' (ID: {image_file_id})")
+
+        elif name.lower() == "expiration_date.txt":
+            print(f"Found Expiration File: '{name}' (ID: {item['id']})")
+            try:
+                # Download text directly into memory
+                request = drive_service.files().get_media(fileId=item["id"])
+                fh = io.BytesIO()
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                fh.seek(0)
+                expiration_date_str = fh.read().decode("utf-8").strip()
+                print(f"Extracted Expiration Date: '{expiration_date_str}'")
+            except Exception as e:
+                print(f"Warning: Failed to download expiration_date.txt: {e}")
 
     if not form_id:
         raise FileNotFoundError("No Google Form found in 'Current_Pageant' folder.")
@@ -598,6 +615,7 @@ def sync_current_pageant():
         "flyer_image": "flyer.jpg",
         "theme_colors": colors,
         "info_sections": info_sections,
+        "expiration_date": expiration_date_str,
         "divisions": [],
         "addons": [],
         "form_fields": [],

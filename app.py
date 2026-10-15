@@ -331,21 +331,19 @@ def sanitize_id(title):
     return re.sub(r'\s+', '_', clean)
 
 
-EXPIRATION_FILE_PATH = os.path.join(BASE_DIR, "expiration_date.txt")
-
 def is_registration_expired():
     """Checks if the current system date/time has passed the date in expiration_date.txt."""
-    if not os.path.exists(EXPIRATION_FILE_PATH):
-        return False  # If file doesn't exist, keep registration open by default
 
+    date_str = EVENT_CONFIG.get("expiration_date", "")
+
+    if not date_str:
+        return False
+
+    # Support YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats
     try:
-        with open(EXPIRATION_FILE_PATH, "r", encoding="utf-8") as f:
-            date_str = f.read().strip()
-
+        date_str = str(date_str).strip()
         if not date_str:
             return False
-
-        # Support YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats
         try:
             expiration_dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
         except ValueError:
