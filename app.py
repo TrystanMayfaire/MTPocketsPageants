@@ -99,6 +99,7 @@ app.title = EVENT_CONFIG.get("title", "MT Pockets Pageant Registration")
 
 
 @server.route('/admin', methods=['GET', 'POST'])
+@server.route('/admin/', methods=['GET', 'POST'])
 def pageant_admin():
     message = ""
     success = False
@@ -144,7 +145,7 @@ def pageant_admin():
                     </div>
                     <button type="submit" class="btn btn-primary w-100 fw-bold">Sync with Google Drive</button>
                 </form>
-                <a href="/pageant/" class="btn btn-link btn-sm w-100 mt-3 text-decoration-none">← Return to Pageant Registration</a>
+                <a href="/pageants/" class="btn btn-link btn-sm w-100 mt-3 text-decoration-none">← Return to Pageant Registration</a>
             </div>
         </body>
         </html>
