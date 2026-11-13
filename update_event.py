@@ -558,21 +558,21 @@ def sync_current_pageant():
             image_file_id = item["id"]
             print(f"Found Flyer Graphic: '{name}' (ID: {image_file_id})")
 
-        elif name.lower() == "expiration_date.txt":
-            print(f"Found Expiration File: '{name}' (ID: {item['id']})")
-            try:
-                # Download text directly into memory
-                request = drive_service.files().get_media(fileId=item["id"])
-                fh = io.BytesIO()
-                downloader = MediaIoBaseDownload(fh, request)
-                done = False
-                while not done:
-                    _, done = downloader.next_chunk()
-                fh.seek(0)
-                expiration_date_str = fh.read().decode("utf-8").strip()
-                print(f"Extracted Expiration Date: '{expiration_date_str}'")
-            except Exception as e:
-                print(f"Warning: Failed to download expiration_date.txt: {e}")
+        elif "expiration_date" in name.lower():
+            if mime == "application/vnd.google-apps.document":
+                # Export Google Doc as plain text
+                raw_bytes = drive_service.files().export_media(
+                    fileId=item["id"],
+                    mimeType="text/plain"
+                ).execute()
+                # Strip any UTF-8 BOM (\ufeff) and whitespace
+                expiration_date_str = raw_bytes.decode("utf-8-sig").strip()
+            else:
+                # Download standard .txt file
+                raw_bytes = drive_service.files().get_media(fileId=item["id"]).execute()
+                expiration_date_str = raw_bytes.decode("utf-8-sig").strip()
+
+            print(f"Found Expiration Date: '{expiration_date_str}'")
 
     if not form_id:
         raise FileNotFoundError("No Google Form found in 'Current_Pageant' folder.")

@@ -10,7 +10,8 @@ import google_auth_httplib2
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from flask import request, jsonify, make_response
+from flask import request, jsonify, make_response, render_template_string
+from update_event import sync_current_pageant
 from googleapiclient.http import MediaIoBaseUpload
 import dash_bootstrap_components as dbc
 from dotenv import load_dotenv
@@ -18,6 +19,7 @@ from dash import html, dcc, Input, Output, ALL, State, MATCH, ClientsideFunction
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "assets", "config.json")
+PAGEANT_PASSWORD = os.environ.get("PAGEANT_PASSWORD", "")
 
 possible_env_paths = [
     os.path.join(BASE_DIR, "secrets", ".env"),
@@ -93,8 +95,61 @@ app = dash.Dash(
 )
 
 server = app.server
-
 app.title = EVENT_CONFIG.get("title", "MT Pockets Pageant Registration")
+
+
+@server.route('/admin', methods=['GET', 'POST'])
+def pageant_admin():
+    message = ""
+    success = False
+    if request.method == 'POST':
+        if request.form.get('password') == PAGEANT_PASSWORD:
+            try:
+                # 1. Run Google Drive & Form sync
+                sync_current_pageant()
+
+                # 2. Dynamically reload EVENT_CONFIG into app memory without restarting
+                global EVENT_CONFIG
+                if os.path.exists(CONFIG_PATH):
+                    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                        EVENT_CONFIG = json.load(f)
+
+                message = "Success! Pageant site successfully synced with Google Drive."
+                success = True
+            except Exception as e:
+                message = f"Sync failed: {e}"
+        else:
+            message = "Incorrect password. Please try again."
+
+    return render_template_string('''
+        <!doctype html>
+        <html lang="en">
+        <head>
+            <title>Pageant Admin Sync</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        </head>
+        <body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
+            <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
+                <h3 class="mb-3 text-center">Pageant Site Sync</h3>
+                <p class="text-muted small text-center">Enter your admin password to pull the latest form and flyer from Google Drive.</p>
+                {% if message %}
+                    <div class="alert {{ 'alert-success' if success else 'alert-danger' }} small" role="alert">
+                        {{ message }}
+                    </div>
+                {% endif %}
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Admin Password</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">Sync with Google Drive</button>
+                </form>
+                <a href="/pageant/" class="btn btn-link btn-sm w-100 mt-3 text-decoration-none">← Return to Pageant Registration</a>
+            </div>
+        </body>
+        </html>
+    ''', message=message, success=success)
+
 
 # --- HELPER RENDER FUNCTIONS ---
 
