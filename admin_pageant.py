@@ -45,107 +45,61 @@ ADMIN_HTML = '''
             Enter the pageant admin password to pull the latest Google Form, flyer, and expiration date from Google Drive.
         </p>
         
-        <div class="mb-3">
-            <label class="form-label fw-bold small">Pageant Admin Password</label>
-            <input type="password" id="adminPassword" class="form-control" required autofocus>
-        </div>
-        
-        <button type="button" id="syncButton" onclick="startSync()" class="btn btn-primary w-100 fw-bold">Sync with Google Drive</button>
-        
-        <!-- Live Status Console Box -->
-        <div id="logConsole" style="display: none; margin-top: 15px; background: #1e1e1e; color: #00ff00; padding: 12px; font-family: monospace; font-size: 0.85rem; border-radius: 4px; height: 160px; overflow-y: auto;">
-            <div id="logContent">Initializing sync...<br></div>
-        </div>
+        {% if message %}
+            <div class="alert {{ 'alert-success' if success else 'alert-danger' }} small" role="alert">
+                {{ message }}
+            </div>
+        {% endif %}
+
+        <form method="post" onsubmit="showLoading()">
+            <div class="mb-3">
+                <label class="form-label fw-bold small">Pageant Admin Password</label>
+                <input type="password" name="password" id="adminPassword" class="form-control" required autofocus>
+            </div>
+            
+            <button type="submit" id="syncButton" class="btn btn-primary w-100 fw-bold">
+                <span id="btnText">Sync with Google Drive</span>
+                <span id="spinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true" style="display: none;"></span>
+            </button>
+        </form>
 
         <a href="{{ return_url }}" class="btn btn-link btn-sm w-100 mt-3 text-decoration-none">← Return to Pageant Registration</a>
     </div>
 
 <script>
-function startSync() {
-    const password = document.getElementById('adminPassword').value;
+function showLoading() {
     const btn = document.getElementById('syncButton');
-    const consoleBox = document.getElementById('logConsole');
-    const logContent = document.getElementById('logContent');
+    const btnText = document.getElementById('btnText');
+    const spinner = document.getElementById('spinner');
     
-    if (!password) {
-        alert("Please enter the admin password.");
-        return;
-    }
-    
-    // Force the console box to become visible immediately
-    consoleBox.style.display = "block";
     btn.disabled = true;
-    btn.innerText = "Syncing...";
-    logContent.innerHTML = "Connecting to sync stream...<br>";
-
-    // Connect to the Flask Server-Sent Events stream
-    const eventSource = new EventSource("/admin/sync-progress?password=" + encodeURIComponent(password));
-
-    eventSource.onmessage = function(event) {
-        logContent.innerHTML += event.data + "<br>";
-        consoleBox.scrollTop = consoleBox.scrollHeight;
-
-        if (event.data.includes("[COMPLETE]") || event.data.includes("[FAILED]")) {
-            eventSource.close();
-            btn.disabled = false;
-            btn.innerText = "Run Google Drive Sync Again";
-        }
-    };
-
-    eventSource.onerror = function(err) {
-        logContent.innerHTML += "<span style='color: orange;'>Stream closed. Check if sync completed.</span><br>";
-        eventSource.close();
-        btn.disabled = false;
-        btn.innerText = "Run Google Drive Sync";
-    };
+    btnText.innerText = "Syncing with Google Drive...";
+    spinner.style.display = "inline-block";
 }
 </script>
 </body>
 </html>
 '''
 
-@admin_app.route('/', methods=['GET'])
-@admin_app.route('/admin', methods=['GET'])
+@admin_app.route('/', methods=['GET', 'POST'])
+@admin_app.route('/admin', methods=['GET', 'POST'])
 def pageant_admin():
-    return render_template_string(ADMIN_HTML, return_url=RETURN_URL)
+    message = ""
+    success = False
 
-@admin_app.route('/admin/sync-progress')
-def sync_progress():
-    password = request.args.get('password', '')
-
-    @stream_with_context
-    def generate():
-        if password != PAGEANT_ADMIN_PASSWORD:
-            yield "data: ERROR: Incorrect password provided.<br>\n\n"
-            yield "data: [FAILED]\n\n"
-            return
-
-        yield "data: Starting Google Drive synchronization...\n\n"
-
-        # Run sync_current_pageant() in an unbuffered subprocess (-u)
-        process = subprocess.Popen(
-            [sys.executable, "-u", "-c", "from update_event import sync_current_pageant; sync_current_pageant()"],
-            cwd=BASE_DIR,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
-
-        # Stream each print() line from update_event.py as it happens
-        for line in process.stdout:
-            clean_line = line.strip()
-            if clean_line:
-                yield f"data: {clean_line}<br>\n\n"
-
-        process.wait()
-
-        if process.returncode == 0:
-            yield "data: <span style='color: #00ffff;'>[COMPLETE]</span><br>\n\n"
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        if password == PAGEANT_ADMIN_PASSWORD:
+            try:
+                sync_current_pageant()
+                message = "Success! Pageant site synced with Google Drive. Refresh the registration page to view updates."
+                success = True
+            except Exception as e:
+                message = f"Sync failed: {e}"
         else:
-            yield "data: <span style='color: red;'>[FAILED]</span><br>\n\n"
+            message = "Incorrect password. Please try again."
 
-    return Response(generate(), mimetype='text/event-stream', headers={'X-Accel-Buffering': 'no'})
+    return render_template_string(ADMIN_HTML, message=message, success=success, return_url=RETURN_URL)
 
 server = admin_app
 
