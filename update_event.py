@@ -25,12 +25,12 @@ env_loaded = False
 for env_path in possible_env_paths:
     if os.path.exists(env_path):
         load_dotenv(env_path)
-        print(f"Loaded environment variables from: {env_path}")
+        print(f"Loaded environment variables from: {env_path}", flush=True)
         env_loaded = True
         break
 
 if not env_loaded:
-    print("Warning: Could not find a .env file in expected locations.")
+    print("Warning: Could not find a .env file in expected locations.", flush=True)
 
 SERVICE_ACCOUNT_FILE = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
@@ -45,7 +45,7 @@ if not SERVICE_ACCOUNT_FILE or not os.path.exists(SERVICE_ACCOUNT_FILE):
     for path in possible_sa_paths:
         if os.path.exists(path):
             SERVICE_ACCOUNT_FILE = path
-            print(f"Auto-detected Service Account JSON at: {SERVICE_ACCOUNT_FILE}")
+            print(f"Auto-detected Service Account JSON at: {SERVICE_ACCOUNT_FILE}", flush=True)
             break
 
 if not SERVICE_ACCOUNT_FILE or not os.path.exists(SERVICE_ACCOUNT_FILE):
@@ -107,7 +107,7 @@ def extract_color_palette(image_path, num_colors=16):
     }
 
     if not os.path.exists(image_path):
-        print(f"Warning: Flyer image not found at '{image_path}'. Using fallback colors.")
+        print(f"Warning: Flyer image not found at '{image_path}'. Using fallback colors.", flush=True)
         return fallback_palette
 
     try:
@@ -182,7 +182,7 @@ def extract_color_palette(image_path, num_colors=16):
             "bg_light": "#f4f6f8"
         }
     except Exception as e:
-        print(f"Error analyzing image colors: {e}. Using fallback palette.")
+        print(f"Error analyzing image colors: {e}. Using fallback palette.", flush=True)
         return fallback_palette
 
 def update_custom_css(colors, css_path=CSS_OUTPUT_PATH):
@@ -342,7 +342,7 @@ summary:hover {{
     os.makedirs(os.path.dirname(css_path), exist_ok=True)
     with open(css_path, "w", encoding="utf-8") as f:
         f.write(css_content.strip())
-    print(f"Updated '{css_path}' with extracted theme palette: {colors}")
+    print(f"Updated '{css_path}' with extracted theme palette: {colors}", flush=True)
 
 # --- GOOGLE DRIVE API HELPERS ---
 
@@ -375,7 +375,7 @@ def get_or_create_google_sheet(drive_service, sheets_service, parent_folder_id, 
 
     if files:
         spreadsheet_id = files[0]["id"]
-        print(f"Found existing Google Sheet (ID: {spreadsheet_id})")
+        print(f"Found existing Google Sheet (ID: {spreadsheet_id})", flush=True)
     else:
         # Create Google Sheet directly inside the target Drive folder
         file_metadata = {
@@ -389,7 +389,7 @@ def get_or_create_google_sheet(drive_service, sheets_service, parent_folder_id, 
             supportsAllDrives=True
         ).execute()
         spreadsheet_id = sheet_file.get("id")
-        print(f"Created new Google Sheet in Drive folder (ID: {spreadsheet_id})")
+        print(f"Created new Google Sheet in Drive folder (ID: {spreadsheet_id})", flush=True)
 
     # Write or update row 1 headers matching the current form schema
     sheets_service.spreadsheets().values().update(
@@ -505,7 +505,7 @@ def get_authorized_http(creds):
     return google_auth_httplib2.AuthorizedHttp(creds, http=http_client)
 
 def sync_current_pageant():
-    print("Authenticating with Service Account...")
+    print("Authenticating with Service Account...", flush=True)
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=SCOPES
     )
@@ -516,7 +516,7 @@ def sync_current_pageant():
     sheets_service = build("sheets", "v4", http=authorized_http)
 
     # 1. Locate 'Current_Pageant' folder in Google Drive
-    print(f"Searching for folder '{FOLDER_NAME}' in Google Drive...")
+    print(f"Searching for folder '{FOLDER_NAME}' in Google Drive...", flush=True)
     folder_query = f"name = '{FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
     folder_result = drive_service.files().list(
         q=folder_query,
@@ -530,7 +530,7 @@ def sync_current_pageant():
         raise FileNotFoundError(f"Could not find folder '{FOLDER_NAME}'. Please ensure it is shared with your Service Account email.")
 
     folder_id = folders[0]["id"]
-    print(f"Found folder '{FOLDER_NAME}' (ID: {folder_id})")
+    print(f"Found folder '{FOLDER_NAME}' (ID: {folder_id})", flush=True)
 
     # 2. Search inside folder for Google Form & Flyer Graphic
     file_query = f"'{folder_id}' in parents and trashed = false"
@@ -552,11 +552,11 @@ def sync_current_pageant():
 
         if mime == "application/vnd.google-apps.form" or name.endswith(".gform"):
             form_id = item["id"]
-            print(f"Found Google Form: '{name}' (ID: {form_id})")
+            print(f"Found Google Form: '{name}' (ID: {form_id})", flush=True)
 
         elif mime.startswith("image/") or name.lower().endswith((".jpg", ".jpeg", ".png")):
             image_file_id = item["id"]
-            print(f"Found Flyer Graphic: '{name}' (ID: {image_file_id})")
+            print(f"Found Flyer Graphic: '{name}' (ID: {image_file_id})", flush=True)
 
         elif "expiration_date" in name.lower():
             if mime == "application/vnd.google-apps.document":
@@ -572,14 +572,14 @@ def sync_current_pageant():
                 raw_bytes = drive_service.files().get_media(fileId=item["id"]).execute()
                 expiration_date_str = raw_bytes.decode("utf-8-sig").strip()
 
-            print(f"Found Expiration Date: '{expiration_date_str}'")
+            print(f"Found Expiration Date: '{expiration_date_str}'", flush=True)
 
     if not form_id:
         raise FileNotFoundError("No Google Form found in 'Current_Pageant' folder.")
 
     # 3. Download Flyer Graphic
     if image_file_id:
-        print(f"Downloading latest flyer graphic to {FLYER_OUTPUT_PATH}...")
+        print(f"Downloading latest flyer graphic to {FLYER_OUTPUT_PATH}...", flush=True)
         os.makedirs(os.path.dirname(FLYER_OUTPUT_PATH), exist_ok=True)
         request = drive_service.files().get_media(fileId=image_file_id)
 
@@ -588,15 +588,15 @@ def sync_current_pageant():
             done = False
             while not done:
                 status, done = downloader.next_chunk()
-        print("Flyer graphic download complete.")
+        print("Flyer graphic download complete.", flush=True)
 
     # 4. Extract Color Palette from Flyer & Generate Custom CSS
-    print("Analyzing flyer graphic palette and updating custom.css...")
+    print("Analyzing flyer graphic palette and updating custom.css...", flush=True)
     colors = extract_color_palette(FLYER_OUTPUT_PATH)
     update_custom_css(colors, CSS_OUTPUT_PATH)
 
     # 5. Fetch Google Form structure via Google Forms API
-    print("Fetching form schema from Google Forms API...")
+    print("Fetching form schema from Google Forms API...", flush=True)
     form_data = forms_service.forms().get(formId=form_id).execute()
 
     info = form_data.get("info", {})
@@ -604,7 +604,7 @@ def sync_current_pageant():
 
     form_description = info.get("description", "")
     base_fee = detect_main_event_fee(form_description, form_items)
-    print(f"Detected Main Event Base Fee: ${base_fee:.2f}")
+    print(f"Detected Main Event Base Fee: ${base_fee:.2f}", flush=True)
 
     info_sections = parse_all_caps_sections(form_description)
 
@@ -829,7 +829,7 @@ def sync_current_pageant():
     with open(CONFIG_OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
 
-    print(f"Successfully generated {CONFIG_OUTPUT_PATH} and {CSS_OUTPUT_PATH} with dynamic color palette!")
+    print(f"Successfully generated {CONFIG_OUTPUT_PATH} and {CSS_OUTPUT_PATH} with dynamic color palette!", flush=True)
 
 if __name__ == "__main__":
     sync_current_pageant()
