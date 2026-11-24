@@ -37,6 +37,36 @@ for env_path in possible_env_paths:
 if not env_loaded:
     print("Warning: Could not find a .env file in expected locations.")
 
+PAYPAL_ENV = os.environ.get("PAYPAL_ENV", "live").strip().lower()
+IS_SANDBOX = PAYPAL_ENV == "sandbox"
+
+if IS_SANDBOX:
+    PAYPAL_CLIENT_ID = (
+        os.environ.get("PAYPAL_SANDBOX_CLIENT_ID")
+        or os.environ.get("PAYPAL_CLIENT_ID")
+        or "test"
+    )
+    PAYPAL_CLIENT_SECRET = (
+        os.environ.get("PAYPAL_SANDBOX_CLIENT_SECRET")
+        or os.environ.get("PAYPAL_CLIENT_SECRET")
+        or "test"
+    )
+    PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com"
+else:
+    PAYPAL_CLIENT_ID = (
+        os.environ.get("PAYPAL_LIVE_CLIENT_ID")
+        or os.environ.get("PAYPAL_CLIENT_ID")
+        or "test"
+    )
+    PAYPAL_CLIENT_SECRET = (
+        os.environ.get("PAYPAL_LIVE_CLIENT_SECRET")
+        or os.environ.get("PAYPAL_CLIENT_SECRET")
+        or "test"
+    )
+    PAYPAL_API_BASE = "https://api-m.paypal.com"
+
+
+
 IS_PRODUCTION = (
     os.environ.get("PYTHONANYWHERE_SITE") is not None
     or os.environ.get("APP_ENV") == "production"
@@ -69,10 +99,6 @@ if os.path.exists(CONFIG_PATH):
 else:
     print(f"WARNING: Configuration file not found at {CONFIG_PATH}")
 
-# PayPal Client ID
-PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "test")
-PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "test")
-
 GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets"
@@ -87,7 +113,8 @@ app = dash.Dash(
     ],
     external_scripts=[
         "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js",
-        f"https://www.paypal.com/sdk/js?client-id={PAYPAL_CLIENT_ID}&currency=USD"
+        (f"https://www.paypal.com/sdk/js?client-id={PAYPAL_CLIENT_ID}&currency=USD"
+         + ("&environment=sandbox" if IS_SANDBOX else ""))
     ],
     suppress_callback_exceptions=True,
 )
@@ -1004,9 +1031,6 @@ app.clientside_callback(
     Output("paypal-mount-status", "children"),
     Input("payment-validation-store", "data")
 )
-
-# PayPal Sandbox or Live API Base URL
-PAYPAL_API_BASE = "https://api-m.paypal.com"
 
 def get_paypal_access_token():
     auth = (PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET)
