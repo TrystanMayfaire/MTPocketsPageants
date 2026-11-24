@@ -385,6 +385,25 @@ def is_registration_expired():
         return False
 
 
+def _get_pay_test_default_for_field(field):
+    """Returns realistic placeholder test data based on field type/label."""
+    fid = str(field.get("id", "")).lower()
+    label = str(field.get("label", "")).lower()
+    ftype = field.get("type", "text")
+
+    if ftype == "email" or "email" in fid or "email" in label:
+        return "paytest@example.com"
+    if ftype == "tel" or "phone" in fid or "tel" in label:
+        return "(304) 555-0199"
+    if ftype == "date" or "dob" in fid or "birth" in label or "date" in label:
+        return "2015-01-01"
+    if "name" in fid or "name" in label:
+        return "Test Contestant"
+    if ftype in ("dropdown", "radio") and field.get("options"):
+        return field["options"][0]
+    return "Pay Test Entry"
+
+
 def build_closed_registration_layout():
     """Layout displayed when registration has closed."""
     return html.Div(children=[
@@ -393,6 +412,7 @@ def build_closed_registration_layout():
         dcc.Store(id="transaction-completed-store", data=False),
         dcc.Store(id="paypal-transaction-store"),
         dcc.Store(id="order-selection-store"),
+        dcc.Location(id="url", refresh=False),
 
         # Header Banner
         html.Div(className="pageant-header text-center mb-4 py-4", children=[
@@ -423,6 +443,11 @@ def build_closed_registration_layout():
     ])
 
 def build_active_registration_layout():
+    divisions = [
+        {"label": f"{div['label']} — ${div['price']:.2f}", "value": div['label']}
+        for div in EVENT_CONFIG.get("divisions", [])
+    ]
+
     return html.Div(children=[
 
         # Form Validation & Transaction Completion Stores
@@ -430,6 +455,8 @@ def build_active_registration_layout():
         dcc.Store(id="transaction-completed-store", data=False),
         dcc.Store(id="paypal-transaction-store"),
         dcc.Store(id="order-selection-store"),
+        dcc.Location(id="url", refresh=False),
+
 
         # 1. Header Banner
         html.Div(className="pageant-header text-center mb-4 py-4", children=[
@@ -522,10 +549,7 @@ def build_active_registration_layout():
                                     html.P(f"Main Event Entry Fee: ${EVENT_CONFIG.get('base_fee', 50.0):.2f}", className="small fw-bold text-muted mb-2"),
                                     dcc.Dropdown(
                                         id="division-select",
-                                        options=[
-                                            {"label": f"{div['label']} — ${div['price']:.2f}", "value": div['label']}
-                                            for div in EVENT_CONFIG.get("divisions", [])
-                                        ],
+                                        options=divisions,
                                         value=EVENT_CONFIG["divisions"][0]["label"] if EVENT_CONFIG.get("divisions") else None,
                                         clearable=False,
                                         className="form-select-lg"
@@ -602,6 +626,14 @@ def calculate_total_fee(selected_division, selected_addons):
     total = 0.0
     breakdown_items = []
 
+    if selected_division == "Pay Test ($1)":
+        selection_data = {
+            "division": selected_division,
+            "addons": None,
+            "amount": 1.0,
+        }
+        return f"$1.00", breakdown_items, selection_data
+
     for div in EVENT_CONFIG.get("divisions", []):
         if div["label"] == selected_division:
             total += div["price"]
@@ -655,34 +687,37 @@ def calculate_total_fee(selected_division, selected_addons):
 )
 def validate_form_and_payment(input_values, upload_contents, selected_division, disclaimer_val,
                               fee_str, input_ids, upload_ids, order_data):
-    input_map = {item["id"]: val for item, val in zip(input_ids, input_values)}
-    upload_map = {item["id"]: val for item, val in zip(upload_ids, upload_contents)}
-
+    is_pay_test = selected_division == "Pay Test ($1)"
     missing_reasons = []
 
-    for field in EVENT_CONFIG.get("form_fields", []):
-        if field.get("required"):
-            fid = field["id"]
-            if field.get("type") == "file":
-                if not upload_map.get(fid):
-                    missing_reasons.append(f"Upload {field['label']}")
-            else:
-                val = input_map.get(fid)
-                if val is None or str(val).strip() == "":
-                    missing_reasons.append(f"Fill out '{field['label']}'")
+    if not is_pay_test:
+        input_map = {item["id"]: val for item, val in zip(input_ids, input_values)}
+        upload_map = {item["id"]: val for item, val in zip(upload_ids, upload_contents)}
+
+        for field in EVENT_CONFIG.get("form_fields", []):
+            if field.get("required"):
+                fid = field["id"]
+                if field.get("type") == "file":
+                    if not upload_map.get(fid):
+                        missing_reasons.append(f"Upload {field['label']}")
+                else:
+                    val = input_map.get(fid)
+                    if val is None or str(val).strip() == "":
+                        missing_reasons.append(f"Fill out '{field['label']}'")
 
     if not selected_division:
         missing_reasons.append("Select a Division")
 
-    disclaimer_cfg = EVENT_CONFIG.get("disclaimer")
-    if disclaimer_cfg:
-        disclaimer_agreed = False
-        if isinstance(disclaimer_val, list):
-            disclaimer_agreed = len(disclaimer_val) > 0
-        elif isinstance(disclaimer_val, str):
-            disclaimer_agreed = disclaimer_val.strip() != ""
-        if not disclaimer_agreed:
-            missing_reasons.append("Agree to the Rules & Disclaimer")
+    if not is_pay_test:
+        disclaimer_cfg = EVENT_CONFIG.get("disclaimer")
+        if disclaimer_cfg:
+            disclaimer_agreed = False
+            if isinstance(disclaimer_val, list):
+                disclaimer_agreed = len(disclaimer_val) > 0
+            elif isinstance(disclaimer_val, str):
+                disclaimer_agreed = disclaimer_val.strip() != ""
+            if not disclaimer_agreed:
+                missing_reasons.append("Agree to the Rules & Disclaimer")
 
     is_valid = len(missing_reasons) == 0
 
@@ -797,6 +832,22 @@ def handle_payment_success(trans_data, input_values, upload_contents, selected_d
     )
 
     return True
+
+
+@app.callback(
+    Output("division-select", "options"),
+    Input("url", "search"),
+)
+def update_division_options(search):
+    divisions = [
+        {"label": f"{div['label']} — ${div['price']:.2f}", "value": div['label']}
+        for div in EVENT_CONFIG.get("divisions", [])
+    ]
+    print(f"Search: {search}")
+    if search and "paytest=1" in search:
+        divisions.append({"label": "Pay Test ($1)", "value": "Pay Test ($1)"})
+
+    return divisions
 
 # ---- GOOGLE SERVICES API HELPER FUNCTIONS ----
 
@@ -945,11 +996,21 @@ def save_registration_to_sheet(transaction_details, form_input_data, upload_data
         "Headshot Image Link": headshot_url
     }
 
+    is_pay_test = selected_division == "Pay Test ($1)"
+
+    if is_pay_test:
+        row_map["Disclaimer Agreed"] = "Yes (Pay Test)"
+        if not row_map.get("Headshot Image Link"):
+            row_map["Headshot Image Link"] = "N/A (Pay Test)"
+
     # Add dynamic form fields
     for field in EVENT_CONFIG.get("form_fields", []):
         fid = field["id"]
         if field.get("type") != "file":
-            row_map[field["label"]] = form_input_data.get(fid, "")
+            val = form_input_data.get(fid)
+            if is_pay_test and (val is None or str(val).strip() == ""):
+                val = _get_pay_test_default_for_field(field)
+            row_map[field["label"]] = val if val is not None else ""
 
     # Add dynamic add-ons
     addons_config = EVENT_CONFIG.get("addons", [])
@@ -980,6 +1041,34 @@ def save_registration_to_sheet(transaction_details, form_input_data, upload_data
 
 def build_paypal_order_payload(selected_division, selected_addons):
     items = []
+
+    if selected_division == "Pay Test ($1)":
+        purchase_unit = {
+            "items": [{
+                "name": f"Pay Test",
+                "sku": f"DIV-9999",
+                "quantity": "1",
+                "unit_amount": {
+                    "currency_code": "USD",
+                    "value": f"{1.00:.2f}"
+                }
+            }],
+            "amount": {
+                "currency_code": "USD",
+                "value": "1.00",
+                "breakdown": {
+                    "item_total": {
+                        "currency_code": "USD",
+                        "value": "1.00"
+                    }
+                },
+            },
+        }
+
+        return {
+            "intent": "CAPTURE",
+            "purchase_units": [purchase_unit]
+        }
 
     # 1. Main Division Line Item
     for div in EVENT_CONFIG.get("divisions", []):
