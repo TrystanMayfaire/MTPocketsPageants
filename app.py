@@ -113,8 +113,7 @@ app = dash.Dash(
     ],
     external_scripts=[
         "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js",
-        (f"https://www.paypal.com/sdk/js?client-id={PAYPAL_CLIENT_ID}&currency=USD"
-         + ("&environment=sandbox" if IS_SANDBOX else ""))
+        f"https://www.paypal.com/sdk/js?client-id={PAYPAL_CLIENT_ID}&currency=USD"
     ],
     suppress_callback_exceptions=True,
 )
