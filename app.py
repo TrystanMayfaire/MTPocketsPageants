@@ -8,7 +8,9 @@ import httplib2
 import requests
 import google_auth_httplib2
 from datetime import datetime
+from google.auth.transport.requests import Request
 from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from flask import request, jsonify, make_response, render_template_string
 from googleapiclient.http import MediaIoBaseUpload
@@ -18,6 +20,7 @@ from dash import html, dcc, Input, Output, ALL, State, MATCH, ClientsideFunction
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "assets", "config.json")
+OAUTH_DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 possible_env_paths = [
     os.path.join(BASE_DIR, "secrets", ".env"),
@@ -797,6 +800,26 @@ def handle_payment_success(trans_data, input_values, upload_contents, selected_d
 
 # ---- GOOGLE SERVICES API HELPER FUNCTIONS ----
 
+def get_oauth_drive_service():
+    """Builds a Drive v3 client using the My Drive owner's OAuth user credentials."""
+    token_file = os.environ.get(
+        "GOOGLE_OAUTH_TOKEN_FILE",
+        "/home/mtpocketstheatre/secrets/gdrive_token.json",
+    )
+    if not os.path.exists(token_file):
+        print(f"[CRITICAL] OAuth token file not found at: {token_file}")
+        return None
+
+    creds = Credentials.from_authorized_user_file(token_file, scopes=OAUTH_DRIVE_SCOPES)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        with open(token_file, "w", encoding="utf-8") as f:
+            f.write(creds.to_json())
+
+    authorized_http = get_authorized_http(creds)
+    return build("drive", "v3", http=authorized_http)
+
+
 def get_authorized_http(creds):
     """Configures httplib2 to route through PythonAnywhere proxy if environment variables are present."""
     proxy_url = (
@@ -902,10 +925,13 @@ def save_registration_to_sheet(transaction_details, form_input_data, upload_data
             break
 
     # Upload Headshot to Drive (checks all upload fields if content is present)
+    upload_drive_service = get_oauth_drive_service() or drive_service
     headshot_url = ""
     for fid, contents in upload_data.items():
         if contents:
-            headshot_url = upload_headshot_to_drive(drive_service, headshot_folder_id, contents, contestant_name)
+            headshot_url = upload_headshot_to_drive(
+                upload_drive_service, headshot_folder_id, contents, contestant_name
+            )
             if headshot_url:
                 break
 
